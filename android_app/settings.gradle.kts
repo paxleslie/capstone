@@ -21,4 +21,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Corkboard-Capstone-App"
 include(":app")
-project(":app").projectDir = File("android-app")
+project(":app").projectDir = File("android_app")
