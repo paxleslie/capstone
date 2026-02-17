@@ -75,5 +75,22 @@ fun LoginScreen(onLoginSuccess: () -> Unit) {
         }) {
             Text("Login")
         }
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Button(onClick = {
+            scope.launch {
+                try {
+                    SupabaseClient.client.auth.signUpWith(Email) {
+                        this.email = email
+                        this.password = password
+                    }
+                    errorText = "Sign up successful! Please check your email or log in."
+                } catch (e: Exception) {
+                    errorText = e.localizedMessage ?: "Sign up failed"
+                }
+            }
+        }) {
+            Text("Sign Up")
+        }
     }
 }
