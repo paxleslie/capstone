@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
+import com.example.myapplication.ui.LoginScreen
 import com.example.myapplication.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
@@ -31,13 +32,18 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {
-                MyApplicationApp()
+                var isLoggedIn by rememberSaveable { mutableStateOf(false) }
+
+                if (isLoggedIn) {
+                    MyApplicationApp()
+                } else {
+                    LoginScreen(onLoginSuccess = { isLoggedIn = true })
+                }
             }
         }
     }
 }
 
-@PreviewScreenSizes
 @Composable
 fun MyApplicationApp() {
     var currentDestination by rememberSaveable { mutableStateOf(AppDestinations.HOME) }
