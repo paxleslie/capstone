@@ -17,13 +17,14 @@ import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffo
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.tooling.preview.PreviewScreenSizes
 import com.example.myapplication.ui.LoginScreen
+import com.example.myapplication.ui.SignupScreen
 import com.example.myapplication.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
@@ -33,11 +34,26 @@ class MainActivity : ComponentActivity() {
         setContent {
             MyApplicationTheme {
                 var isLoggedIn by rememberSaveable { mutableStateOf(false) }
+                var showSignup by remember { mutableStateOf(false) }
 
                 if (isLoggedIn) {
                     MyApplicationApp()
                 } else {
-                    LoginScreen(onLoginSuccess = { isLoggedIn = true })
+                    if (showSignup) {
+                        SignupScreen(
+                            onSignupSuccess = { 
+                                showSignup = false 
+                            },
+                            onBackToLogin = { 
+                                showSignup = false 
+                            }
+                        )
+                    } else {
+                        LoginScreen(
+                            onLoginSuccess = { isLoggedIn = true },
+                            onNavigateToSignup = { showSignup = true }
+                        )
+                    }
                 }
             }
         }
@@ -86,7 +102,7 @@ enum class AppDestinations(
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
     Text(
-        text = "Hello $name!",
+        text = "yup! shit works",
         modifier = modifier
     )
 }

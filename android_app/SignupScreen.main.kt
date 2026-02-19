@@ -1,3 +1,4 @@
+#!/usr/bin/env kotlin
 package com.example.myapplication.ui
 
 import androidx.compose.foundation.layout.Arrangement
@@ -7,10 +8,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,7 +26,7 @@ import io.github.jan.supabase.auth.providers.builtin.Email
 import kotlinx.coroutines.launch
 
 @Composable
-fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToSignup: () -> Unit) {
+fun LoginScreen(onLoginSuccess: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorText by remember { mutableStateOf<String?>(null) }
@@ -40,9 +39,9 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToSignup: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(text = "Login", style = MaterialTheme.typography.headlineMedium)
+        Text(text = "Login", style = androidx.compose.material3.MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
@@ -55,27 +54,19 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToSignup: () -> Unit) {
             label = { Text("Password") },
             visualTransformation = PasswordVisualTransformation()
         )
-        
+
         errorText?.let {
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = it, color = androidx.compose.ui.graphics.Color.Red)
         }
-        
+
         Spacer(modifier = Modifier.height(16.dp))
         Button(onClick = {
             scope.launch {
-                val trimmedEmail = email.trim()
-                val trimmedPassword = password.trim()
-                
-                if (trimmedEmail.isEmpty() || trimmedPassword.isEmpty()) {
-                    errorText = "Email and password cannot be empty"
-                    return@launch
-                }
-
                 try {
                     SupabaseClient.client.auth.signInWith(Email) {
-                        this.email = trimmedEmail
-                        this.password = trimmedPassword
+                        this.email = email
+                        this.password = password
                     }
                     onLoginSuccess()
                 } catch (e: Exception) {
@@ -87,8 +78,20 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToSignup: () -> Unit) {
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-        TextButton(onClick = onNavigateToSignup) {
-            Text("Don't have an account? Sign Up")
+        Button(onClick = {
+            scope.launch {
+                try {
+                    SupabaseClient.client.auth.signUpWith(Email) {
+                        this.email = email
+                        this.password = password
+                    }
+                    errorText = "Sign up successful! Please check your email or log in."
+                } catch (e: Exception) {
+                    errorText = e.localizedMessage ?: "Sign up failed"
+                }
+            }
+        }) {
+            Text("Sign Up")
         }
     }
 }

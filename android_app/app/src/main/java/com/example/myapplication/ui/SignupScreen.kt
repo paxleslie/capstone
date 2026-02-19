@@ -1,11 +1,14 @@
 package com.example.myapplication.ui
 
+import android.util.Log
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -25,70 +28,116 @@ import com.example.myapplication.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 @Composable
-fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToSignup: () -> Unit) {
+fun SignupScreen(onSignupSuccess: () -> Unit, onBackToLogin: () -> Unit) {
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
+    var fullName by remember { mutableStateOf("") }
+    var displayName by remember { mutableStateOf("") }
+    var phoneNumber by remember { mutableStateOf("") }
+    
     var errorText by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val scrollState = rememberScrollState()
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
+            .padding(16.dp)
+            .verticalScroll(scrollState),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(text = "Login", style = MaterialTheme.typography.headlineMedium)
+        Text(text = "Create Account", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(16.dp))
-        
+
+        OutlinedTextField(
+            value = fullName,
+            onValueChange = { fullName = it },
+            label = { Text("Full Name") }
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedTextField(
+            value = displayName,
+            onValueChange = { displayName = it },
+            label = { Text("Display Name") }
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        OutlinedTextField(
+            value = phoneNumber,
+            onValueChange = { phoneNumber = it },
+            label = { Text("Phone Number") }
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
             label = { Text("Email") }
         )
         Spacer(modifier = Modifier.height(8.dp))
+        
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
             label = { Text("Password") },
             visualTransformation = PasswordVisualTransformation()
         )
-        
+
         errorText?.let {
             Spacer(modifier = Modifier.height(8.dp))
             Text(text = it, color = androidx.compose.ui.graphics.Color.Red)
         }
-        
+
         Spacer(modifier = Modifier.height(16.dp))
         Button(onClick = {
             scope.launch {
                 val trimmedEmail = email.trim()
                 val trimmedPassword = password.trim()
-                
-                if (trimmedEmail.isEmpty() || trimmedPassword.isEmpty()) {
-                    errorText = "Email and password cannot be empty"
+                val trimmedFullName = fullName.trim()
+                val trimmedDisplayName = displayName.trim()
+                val trimmedPhone = phoneNumber.trim()
+
+                if (trimmedEmail.isEmpty() || trimmedPassword.isEmpty() || trimmedFullName.isEmpty()) {
+                    errorText = "Name, Email and Password are required"
                     return@launch
                 }
 
                 try {
-                    SupabaseClient.client.auth.signInWith(Email) {
+                    val metadata = buildJsonObject {
+                        put("full_name", trimmedFullName)
+                        put("name", trimmedFullName)
+                        put("display_name", trimmedDisplayName)
+                        put("displayName", trimmedDisplayName)
+                        put("phone", trimmedPhone)
+                        put("phone_number", trimmedPhone)
+                    }
+                    
+                    Log.d("SupabaseSignup", "Sending metadata: $metadata")
+
+                    SupabaseClient.client.auth.signUpWith(Email) {
                         this.email = trimmedEmail
                         this.password = trimmedPassword
+                        this.data = metadata
                     }
-                    onLoginSuccess()
+                    errorText = "Sign up successful! Please check your email."
                 } catch (e: Exception) {
-                    errorText = e.localizedMessage ?: "Login failed"
+                    Log.e("SupabaseSignup", "Signup error", e)
+                    errorText = e.localizedMessage ?: "Sign up failed"
                 }
             }
         }) {
-            Text("Login")
+            Text("Sign Up")
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-        TextButton(onClick = onNavigateToSignup) {
-            Text("Don't have an account? Sign Up")
+        TextButton(onClick = onBackToLogin) {
+            Text("Already have an account? Log In")
         }
     }
 }
