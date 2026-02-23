@@ -22,8 +22,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-// import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewScreenSizes
+import com.example.myapplication.ui.pages.FavoritesPage
+import com.example.myapplication.ui.pages.HomePage
+import com.example.myapplication.ui.pages.ProfilePage
+import com.example.myapplication.ui.pages.StorePage
 import com.example.myapplication.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
@@ -79,36 +82,4 @@ enum class AppDestinations(
     FAVORITES("Favorites", Icons.Default.Favorite),
     PROFILE("Profile", Icons.Default.AccountBox),
     STORE(label = "Store", Icons.Default.ShoppingCart)
-}
-
-@Composable
-fun HomePage(modifier: Modifier = Modifier) {
-    Text(
-        text = "Home Page",
-        modifier = modifier
-    )
-}
-
-@Composable
-fun FavoritesPage(modifier: Modifier = Modifier) {
-    Text(
-        text = "Favorites Page",
-        modifier = modifier
-    )
-}
-
-@Composable
-fun ProfilePage(modifier: Modifier = Modifier) {
-    Text(
-        text = "Profile Page",
-        modifier = modifier
-    )
-}
-
-@Composable
-fun StorePage(modifier: Modifier = Modifier) {
-    Text(
-        text = "Store Page",
-        modifier = modifier
-    )
 }
