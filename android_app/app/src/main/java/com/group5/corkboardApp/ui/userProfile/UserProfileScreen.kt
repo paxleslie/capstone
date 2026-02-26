@@ -1,4 +1,4 @@
-package com.example.myapplication.ui.pages
+package com.group5.corkboardApp.ui.userProfile
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -14,13 +14,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.myapplication.SupabaseClient
+import com.group5.corkboardApp.util.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.jsonPrimitive
 
 @Composable
-fun HomePage(modifier: Modifier = Modifier) {
+fun UserProfileScreen(modifier: Modifier = Modifier) {
     val scope = rememberCoroutineScope()
     // Directly get the user from the current session
     val user = SupabaseClient.client.auth.currentUserOrNull()

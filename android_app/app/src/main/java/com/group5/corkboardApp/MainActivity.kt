@@ -1,4 +1,4 @@
-package com.example.myapplication
+package com.group5.corkboardApp
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -7,11 +7,6 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBox
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.ShoppingCart
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -25,15 +20,16 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.tooling.preview.Preview
-import com.example.myapplication.ui.LoginScreen
-import com.example.myapplication.ui.SignupScreen
-import com.example.myapplication.ui.pages.FavoritesPage
-import com.example.myapplication.ui.pages.HomePage
-import com.example.myapplication.ui.pages.ProfilePage
-import com.example.myapplication.ui.pages.StorePage
-import com.example.myapplication.ui.theme.MyApplicationTheme
+import com.group5.corkboardApp.ui.auth.LoginScreen
+import com.group5.corkboardApp.ui.auth.SignupScreen
+import com.group5.corkboardApp.ui.board.BoardScreen
+import com.group5.corkboardApp.ui.userProfile.UserProfileScreen
+import com.group5.corkboardApp.ui.household.HouseholdScreen
+import com.group5.corkboardApp.ui.message.MessageScreen
+import com.group5.corkboardApp.ui.theme.MyApplicationTheme
+import com.group5.corkboardApp.util.Constants
+import com.group5.corkboardApp.util.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.status.SessionStatus
 
@@ -42,7 +38,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MyApplicationTheme {
+            _root_ide_package_.com.group5.corkboardApp.ui.theme.MyApplicationTheme {
                 AuthGate()
             }
         }
@@ -82,11 +78,11 @@ fun AuthGate() {
 
 @Composable
 fun MyApplicationApp() {
-    var currentDestination by remember { mutableStateOf(AppDestinations.HOME) }
+    var currentDestination by remember { mutableStateOf(Constants.AppDestinations.BOARD) }
 
     NavigationSuiteScaffold(
         navigationSuiteItems = {
-            AppDestinations.entries.forEach {
+            Constants.AppDestinations.entries.forEach {
                 item(
                     icon = {
                         Icon(
@@ -103,25 +99,16 @@ fun MyApplicationApp() {
     ) {
         Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
             when (currentDestination) {
-                AppDestinations.HOME -> HomePage(modifier = Modifier.padding(innerPadding))
-                AppDestinations.FAVORITES -> FavoritesPage(modifier = Modifier.padding(innerPadding))
-                AppDestinations.PROFILE -> ProfilePage(modifier = Modifier.padding(innerPadding))
-                AppDestinations.STORE -> StorePage(modifier = Modifier.padding(innerPadding))
+                Constants.AppDestinations.BOARD -> BoardScreen(modifier = Modifier.padding(innerPadding))
+                Constants.AppDestinations.MESSAGE -> MessageScreen(modifier = Modifier.padding(innerPadding))
+                Constants.AppDestinations.HOUSEHOLD -> HouseholdScreen(modifier = Modifier.padding(innerPadding))
+                Constants.AppDestinations.PROFILE -> UserProfileScreen(modifier = Modifier.padding(innerPadding))
             }
         }
     }
 }
 
-enum class AppDestinations(
-    val label: String,
-    val icon: ImageVector,
-) {
-    HOME("Home", Icons.Default.Home),
-    FAVORITES("Favorites", Icons.Default.Favorite),
-    PROFILE("Profile", Icons.Default.AccountBox),
-    STORE(label = "Store", Icons.Default.ShoppingCart)
-}
-
+// this should go into UserProfileScreen
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
     Text(
