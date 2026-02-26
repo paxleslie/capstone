@@ -1,13 +1,13 @@
-package com.example.myapplication.ui.pages
+package com.group5.corkboardApp.ui.household
 
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
 @Composable
-fun FavoritesPage(modifier: Modifier = Modifier) {
+fun HouseholdScreen(modifier: Modifier = Modifier) {
     Text(
-        text = "Favorites Page",
+        text = "For household management",
         modifier = modifier
     )
 }

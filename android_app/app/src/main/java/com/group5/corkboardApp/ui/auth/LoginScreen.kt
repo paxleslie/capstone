@@ -1,4 +1,4 @@
-package com.example.myapplication.ui
+package com.group5.corkboardApp.ui.auth
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,9 +19,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
-import com.example.myapplication.SupabaseClient
+import com.group5.corkboardApp.util.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.auth.providers.builtin.Email
 import kotlinx.coroutines.launch
@@ -58,7 +59,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToSignup: () -> Unit) {
         
         errorText?.let {
             Spacer(modifier = Modifier.height(8.dp))
-            Text(text = it, color = androidx.compose.ui.graphics.Color.Red)
+            Text(text = it, color = Color.Red)
         }
         
         Spacer(modifier = Modifier.height(16.dp))
