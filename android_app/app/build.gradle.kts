@@ -7,11 +7,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.myapplication"
+    namespace = "com.group5.corkboardApp"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.example.myapplication"
+        applicationId = "com.group5.corkboardApp"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
