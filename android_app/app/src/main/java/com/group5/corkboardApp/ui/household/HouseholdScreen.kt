@@ -59,9 +59,9 @@ fun HouseholdScreen(modifier: Modifier = Modifier) {
         AlertDialog(
             onDismissRequest = {
                 if (createState !is CreateHouseholdState.Loading) {
-                    //showDialog = false
-                    //householdName = ""
-                    //errorText = null
+                    showDialog = false
+                    householdName = ""
+                    errorText = null
                     viewModel.resetState()
                 }
             },
@@ -85,7 +85,7 @@ fun HouseholdScreen(modifier: Modifier = Modifier) {
                 Button(
                     onClick = {
                         if (householdName.isBlank()) {
-                            //errorText = "Please enter a household name"
+                            errorText = "Please enter a household name"
                         } else {
                             viewModel.createHousehold(householdName.trim())
                         }
@@ -102,9 +102,9 @@ fun HouseholdScreen(modifier: Modifier = Modifier) {
             dismissButton = {
                 TextButton(
                     onClick = {
-                        //showDialog = false
-                        //householdName = ""
-                        //errorText = null
+                        showDialog = false
+                        householdName = ""
+                        errorText = null
                         viewModel.resetState()
                     },
                     enabled = createState !is CreateHouseholdState.Loading
