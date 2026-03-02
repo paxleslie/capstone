@@ -23,9 +23,9 @@ data class Household(
 )
 
 @Serializable
-data class Profile(
+data class UserProfile(
     val display_name: String? = null,
-    val full_name: String? = null,
+    val name: String? = null,
     val email: String? = null
 )
 
@@ -35,7 +35,7 @@ data class HouseholdMember(
     val user_id: String,
     val household_id: String,
     val role: String,
-    val profiles: Profile? = null
+    val users: UserProfile? = null
 )
 
 sealed class HouseholdUiState {
@@ -101,7 +101,7 @@ class HouseholdViewModel : ViewModel() {
         return try {
             Log.d("HouseholdVM", "Fetching members for household: $householdId")
             val result = client.postgrest["household_members"]
-                .select(Columns.raw("*, profiles(display_name, full_name, email)")) {
+                .select(Columns.raw("*, users(display_name, name, email)")) {
                     filter {
                         eq("household_id", householdId)
                     }
@@ -137,7 +137,6 @@ class HouseholdViewModel : ViewModel() {
                     params
                 )
                 onResult(true, "Member added successfully")
-                // No need to fetch all households, just refresh members in the UI
             } catch (e: Exception) {
                 Log.e("HouseholdVM", "RPC failed", e)
                 onResult(false, e.localizedMessage ?: "Failed to add member")
