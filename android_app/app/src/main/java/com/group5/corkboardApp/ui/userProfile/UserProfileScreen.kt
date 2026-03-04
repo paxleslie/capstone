@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
@@ -32,27 +31,40 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.group5.corkboardApp.ui.household.Household
-import com.group5.corkboardApp.ui.household.HouseholdMember
-import com.group5.corkboardApp.ui.household.HouseholdUiState
 import com.group5.corkboardApp.ui.household.HouseholdViewModel
 import com.group5.corkboardApp.util.SupabaseClient
-import io.github.jan.supabase.auth.auth
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.jsonPrimitive
 
 @Composable
 fun UserProfileScreen(modifier: Modifier = Modifier) {
+    // the scope is the viewModel
     val scope = rememberCoroutineScope()
-    val householdViewModel: HouseholdViewModel = viewModel()
-    val uiState by householdViewModel.uiState.collectAsState()
-    
-    val user = SupabaseClient.client.auth.currentUserOrNull()
-    val fullName = user?.userMetadata?.get("full_name")?.jsonPrimitive?.content ?: "No full name"
-    val email = user?.email ?: "No email"
 
-    var showHouseholdList by remember { mutableStateOf(false) }
-    var selectedHousehold by remember { mutableStateOf<Household?>(null) }
+    // having both the profileView model and the householdView model is fine
+    // but userprofile should be a viewmodel
+    val householdViewModel: HouseholdViewModel = viewModel()
+    val householdUiState by householdViewModel.uiState.collectAsState()
+
+    val profileViewModel : UserProfileViewModel = viewModel()
+    val profileUiState by profileViewModel.uiState.collectAsState()
+    val navState by profileViewModel.navState.collectAsState()
+
+
+
+    // should be in the view model, not the UI
+//    val user = SupabaseClient.client.auth.currentUserOrNull()
+//    val fullName = user?.userMetadata?.get("full_name")?.jsonPrimitive?.content ?: "No full name"
+//    val email = user?.email ?: "No email"
+
+    // needs to be in the view model, will reset if the screen rotates
+//    var showHouseholdList by remember { mutableStateOf(false) }
+//    var selectedHousehold by remember { mutableStateOf<Household?>(null) }
+
+    // we tell the viewmodel to get the userinfo
+    // in LaunchedEffect so that it only runs once
+    LaunchedEffect(Unit) {
+        profileViewModel.getUserInfo()
+    }
 
     Column(
         modifier = modifier
@@ -60,78 +72,116 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (!showHouseholdList && selectedHousehold == null) {
-            // Profile Info View
-            Text(text = "Profile", style = MaterialTheme.typography.headlineMedium)
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(text = "Name: $fullName")
-            Text(text = "Email: $email")
-            Spacer(modifier = Modifier.height(24.dp))
+        when (val state = navState) {
+            // explorer view - no household selected
+            is UserProfileViewModel.NavState.Profile -> {
+                Text(text = "Profile", style = MaterialTheme.typography.headlineMedium)
+                Spacer(modifier = Modifier.height(16.dp))
 
-            Button(onClick = { showHouseholdList = true }) {
-                Text("Manage Households")
+                // handle the different state of profileUI
+                // But this will show the user profile
+                when (val state = profileUiState) {
+                    // loading
+                    is UserProfileViewModel.ProfileState.Loading -> {
+                        CircularProgressIndicator()
+                    }
+                    //error
+                    is UserProfileViewModel.ProfileState.Error -> {
+                        Text(text = state.message, color = Color.Red)
+                        Button (onClick = { profileViewModel.getUserInfo() }) {
+                            Text("Retry")
+                        }
+                    }
+                    // success, we got the user info
+                    is UserProfileViewModel.ProfileState.Success -> {
+                        Text(text = "Name: ${state.fullName}")
+                        Text(text = "Email: ${state.email}")
+
+                        Spacer(modifier = Modifier.height(24.dp))
+                        // button are inside success scope, won't appear otherwise
+                        Button(onClick = { profileViewModel.navToListHouseholds() }) {
+                            Text("Manage Households")
+                        }
+
+                    }
+                    else -> {}
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(onClick = {profileViewModel.signOut()}) {
+                    Text("Log Out")
+                }
+
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = { scope.launch { SupabaseClient.client.auth.signOut() } }) {
-                Text("Log Out")
-            }
-        } else if (showHouseholdList && selectedHousehold == null) {
-            // Household List View
-            Text(text = "Your Households", style = MaterialTheme.typography.headlineMedium)
-            Spacer(modifier = Modifier.height(16.dp))
-            
-            when (val state = uiState) {
-                is HouseholdUiState.Loading -> CircularProgressIndicator()
-                is HouseholdUiState.Error -> Text(text = state.message, color = Color.Red)
-                is HouseholdUiState.Success -> {
-                    if (state.households.isEmpty()) {
-                        Text("You are not in any households.")
-                    } else {
-                        LazyColumn {
-                            items(state.households) { household ->
-                                Card(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                    onClick = { selectedHousehold = household }
-                                ) {
-                                    Text(text = household.household_name, modifier = Modifier.padding(16.dp))
+            // List households view
+            is UserProfileViewModel.NavState.List -> {
+                Text(text = "Your Households", style = MaterialTheme.typography.headlineMedium)
+                Spacer(modifier = Modifier.height(16.dp))
+                // handle household UI states
+                when (val state = householdUiState) {
+                    is householdUiState.Loading -> CircularProgressIndicator()
+                    is HouseholdUiState.Error -> Text(text = state.message, color = Color.Red)
+                    is HouseholdUiState.Success -> {
+                        if (state.households.isEmpty()) {
+                            Text("You are not in any households.")
+                        } else {
+                            LazyColumn {
+                                items(state.households) { household ->
+                                    Card(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 4.dp),
+                                        onClick = { selectedHousehold = household }
+                                    ) {
+                                        Text(
+                                            text = household.household_name,
+                                            modifier = Modifier.padding(16.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
+                Spacer(modifier = Modifier.height(16.dp))
+                // should be using the viewmodel
+                TextButton(onClick = { showHouseholdList = false }) { Text("Back to Profile") }
+            } else if (selectedHousehold != null) {
+                // Detailed Household View
+                HouseholdDetailsView(
+                    household = selectedHousehold!!,
+                    viewModel = householdViewModel,
+                    onBack = { selectedHousehold = null }
+                )
             }
-            Spacer(modifier = Modifier.height(16.dp))
-            TextButton(onClick = { showHouseholdList = false }) { Text("Back to Profile") }
-        } else if (selectedHousehold != null) {
-            // Detailed Household View
-            HouseholdDetailsView(
-                household = selectedHousehold!!,
-                viewModel = householdViewModel,
-                onBack = { selectedHousehold = null }
-            )
+            else -> {}
         }
     }
 }
 
 @Composable
 fun HouseholdDetailsView(household: Household, viewModel: HouseholdViewModel, onBack: () -> Unit) {
+    // this all should be in a viewmodel - householdViewmodel probably has this now
     var members by remember { mutableStateOf<List<HouseholdMember>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var emailToAdd by remember { mutableStateOf("") }
     var statusMessage by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
-    
+    // this wont survive a rotation
     val currentUser = SupabaseClient.client.auth.currentUserOrNull()
     
     // Find the current user's membership in this list
+    // viewmodel logic
     val myMemberRecord = members.find { it.user_id == currentUser?.id }
     val myRole = myMemberRecord?.role ?: "Loading..."
     
     // Admin check: either explicitly 'admin' role OR the owner of the household
+    // WHATS THE POINT OF HAVING A ROLE IF WE ALSO HAVE AN OWNER COL IN HOUSEHOLDS
     val isAdmin = myRole.equals("admin", ignoreCase = true) || 
                   (myMemberRecord != null && myMemberRecord.member_id == household.owner_member_id)
 
     // Helper to refresh members
+    // we don't need to refresh - we're suppose to rely on state flows
     val refreshMembers = {
         isLoading = true
         viewModel.viewModelScope.launch {
@@ -140,6 +190,7 @@ fun HouseholdDetailsView(household: Household, viewModel: HouseholdViewModel, on
         }
     }
 
+    // should be relying on state flows
     LaunchedEffect(household.household_id) {
         members = viewModel.getMembers(household.household_id)
         isLoading = false
@@ -154,10 +205,11 @@ fun HouseholdDetailsView(household: Household, viewModel: HouseholdViewModel, on
             Text(text = "Members", style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.weight(1f))
             if (!isLoading) {
+                // we shouldn't need a refresh button - symptom of not relying on state flows
                TextButton(onClick = { refreshMembers() }) { Text("Refresh") }
             }
         }
-        
+        // good, but should be using the state of the viewmodel, not a remember
         if (isLoading) {
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
@@ -167,6 +219,7 @@ fun HouseholdDetailsView(household: Household, viewModel: HouseholdViewModel, on
                 items(members) { member ->
                     Column(modifier = Modifier.padding(vertical = 8.dp)) {
                         // Accessing display_name through the profiles object
+                        // member should be accessed THROUGH the viewmodel state
                         val profile = member.profiles
                         val nameToShow = profile?.display_name ?: profile?.full_name ?: profile?.email ?: "User (${member.user_id.take(8)}...)"
                         Text(text = nameToShow)
@@ -178,6 +231,8 @@ fun HouseholdDetailsView(household: Household, viewModel: HouseholdViewModel, on
         }
 
         // Show add member section if admin OR if members haven't loaded yet (to avoid flickering)
+        // this state should be in the viewModel - we can easily set isAdmin default to false,
+        // so that we never get the flickering
         if (isAdmin || isLoading) {
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
@@ -199,7 +254,9 @@ fun HouseholdDetailsView(household: Household, viewModel: HouseholdViewModel, on
                         }
                     }
                 },
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
                 enabled = !isLoading
             ) {
                 Text("Add Member")

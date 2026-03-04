@@ -24,7 +24,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 
 @Composable
 fun HouseholdScreen(modifier: Modifier = Modifier) {
-    val viewModel: HouseholdManagerViewModel = viewModel()
+    val viewModel: HouseholdViewModel = viewModel()
     val createState by viewModel.createState.collectAsState()
 
     var showDialog by remember { mutableStateOf(false) }
@@ -33,13 +33,13 @@ fun HouseholdScreen(modifier: Modifier = Modifier) {
 
     LaunchedEffect(createState) {
         when (val state = createState) {
-            is CreateHouseholdState.Success -> {
+            is HouseholdViewModel.CreateState.Success -> {
                 showDialog = false
                 householdName = ""
                 errorText = null
-                viewModel.resetState()
+                viewModel.resetCreateState()
             }
-            is CreateHouseholdState.Error -> {
+            is HouseholdViewModel.CreateState.Error -> {
                 errorText = state.message
             }
             else -> {}
@@ -58,11 +58,11 @@ fun HouseholdScreen(modifier: Modifier = Modifier) {
     if (showDialog) {
         AlertDialog(
             onDismissRequest = {
-                if (createState !is CreateHouseholdState.Loading) {
+                if (createState !is HouseholdViewModel.CreateState.Loading) {
                     showDialog = false
                     householdName = ""
                     errorText = null
-                    viewModel.resetState()
+                    viewModel.resetCreateState()
                 }
             },
             title = { Text("Create Household") },
@@ -74,7 +74,7 @@ fun HouseholdScreen(modifier: Modifier = Modifier) {
                         label = { Text("Household Name") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = createState !is CreateHouseholdState.Loading
+                        enabled = createState !is HouseholdViewModel.CreateState.Loading
                     )
                     errorText?.let {
                         Text(text = it, color = Color.Red)
@@ -90,9 +90,9 @@ fun HouseholdScreen(modifier: Modifier = Modifier) {
                             viewModel.createHousehold(householdName.trim())
                         }
                     },
-                    enabled = createState !is CreateHouseholdState.Loading
+                    enabled = createState !is HouseholdViewModel.CreateState.Loading
                 ) {
-                    if (createState is CreateHouseholdState.Loading) {
+                    if (createState is HouseholdViewModel.CreateState.Loading) {
                         CircularProgressIndicator()
                     } else {
                         Text("Create")
@@ -105,9 +105,9 @@ fun HouseholdScreen(modifier: Modifier = Modifier) {
                         showDialog = false
                         householdName = ""
                         errorText = null
-                        viewModel.resetState()
+                        viewModel.resetCreateState()
                     },
-                    enabled = createState !is CreateHouseholdState.Loading
+                    enabled = createState !is HouseholdViewModel.CreateState.Loading
                 ) {
                     Text("Cancel")
                 }

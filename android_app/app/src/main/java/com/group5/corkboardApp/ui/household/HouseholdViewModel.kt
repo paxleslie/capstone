@@ -7,12 +7,16 @@ import com.group5.corkboardApp.util.SupabaseClient
 import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
+import io.github.jan.supabase.postgrest.rpc
+import io.ktor.util.collections.StringMap
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+import java.util.UUID
 
 @Serializable
 data class Household(
@@ -38,29 +42,103 @@ data class HouseholdMember(
     val profiles: Profile? = null
 )
 
-sealed class HouseholdUiState {
-    object Loading : HouseholdUiState()
-    data class Success(val households: List<Household>) : HouseholdUiState()
-    data class Error(val message: String) : HouseholdUiState()
-}
+@Serializable
+data class CreateHouseholdParams(
+    @SerialName ("p_household_name")
+    val householdName: String,
+    @SerialName ("p_member_id")
+    val userID: String
+)
 
 class HouseholdViewModel : ViewModel() {
+    sealed class CreateState {
+        data object Idle : CreateState()
+        data object Loading : CreateState()
+        data object Success : CreateState()
+        data class Error(val message: String) : CreateState()
+    }
+
+    // this seems like it should be in its own class, specifically for seeing
+    // all of the households you're a part of, not part of a specific household screen
+    sealed class ListHouseholdState {
+        data object Idle : ListHouseholdState()
+        data object Loading : ListHouseholdState()
+        data class Success(
+            val households: List<Household>,
+            val isRefreshing : Boolean = false
+        ) : ListHouseholdState() {
+            // have isEmpty automatically set based on the houseHolds list
+            val isEmpty get() = households.isEmpty()
+        }
+        data class Error(
+            val message: String,
+            // determine if they can retry (network error vs db error)
+            val canRetry: Boolean = true
+        ) : ListHouseholdState()
+    }
+
+    sealed class ListMemberState {
+        data object Idle : ListMemberState()
+        data object Loading : ListMemberState()
+
+        data class Success (
+            val members : List<HouseholdMember>
+        ) : ListMemberState () {
+            val isEmpty get() = members.isEmpty()
+        }
+        data class Error(
+            val message: String,
+        ) : ListMemberState()
+    }
     private val client = SupabaseClient.client
-    
-    private val _uiState = MutableStateFlow<HouseholdUiState>(HouseholdUiState.Loading)
-    val uiState: StateFlow<HouseholdUiState> = _uiState
+    // stateflow for the household list state
+    private val _uiState = MutableStateFlow<ListHouseholdState>(ListHouseholdState.Loading)
+    val uiState: StateFlow<ListHouseholdState> = _uiState
+
+    //stateflow for the create state
+    private val _createState = MutableStateFlow<CreateState>(CreateState.Idle)
+    val createState: StateFlow<CreateState> = _createState
+
+    private val _listMemberState = MutableStateFlow<ListMemberState>(ListMemberState.Idle)
+    val listMemberState: StateFlow<ListMemberState> = _listMemberState
+
+
 
     init {
         fetchHouseholds()
     }
 
+    fun createHousehold(name: String) {
+        viewModelScope.launch {
+            _createState.value = CreateState.Loading
+            // THIS SHOULD GO INTO DATAREPO
+            try {
+                val memberId = client.auth.currentUserOrNull()?.id
+                    ?: throw Exception("User not authenticated")
+
+                client.postgrest.rpc(
+                    "create_household",
+                    CreateHouseholdParams(
+                        householdName = name,
+                        userID = memberId
+                    )
+                )
+
+                _createState.value = CreateState.Success
+            } catch (e: Exception) {
+                _createState.value = CreateState.Error(e.localizedMessage ?: "Failed to create household")
+            }
+        }
+    }
+
     fun fetchHouseholds() {
         viewModelScope.launch {
-            _uiState.value = HouseholdUiState.Loading
+            _uiState.value = ListHouseholdState.Loading
+            // THIS GOES INTO DATAREPO
             try {
                 val user = client.auth.currentUserOrNull()
                 val userId = user?.id ?: run {
-                    _uiState.value = HouseholdUiState.Error("User not authenticated")
+                    _uiState.value = ListHouseholdState.Error("User not authenticated")
                     return@launch
                 }
                 
@@ -77,7 +155,7 @@ class HouseholdViewModel : ViewModel() {
                 val householdIds = memberEntries.map { it.household_id }
                 
                 if (householdIds.isEmpty()) {
-                    _uiState.value = HouseholdUiState.Success(emptyList())
+                    _uiState.value = ListHouseholdState.Success(emptyList())
                     return@launch
                 }
 
@@ -89,15 +167,35 @@ class HouseholdViewModel : ViewModel() {
                     }.decodeList<Household>()
                 
                 Log.d("HouseholdVM", "Fetched ${households.size} households")
-                _uiState.value = HouseholdUiState.Success(households)
+                _uiState.value = ListHouseholdState.Success(households)
             } catch (e: Exception) {
                 Log.e("HouseholdVM", "Error fetching households", e)
-                _uiState.value = HouseholdUiState.Error(e.localizedMessage ?: "Failed to fetch households")
+                _uiState.value = ListHouseholdState.Error(e.localizedMessage ?: "Failed to fetch households")
             }
         }
     }
 
-    suspend fun getMembers(householdId: String): List<HouseholdMember> {
+
+    fun getHouseholdMembers (householdId: String) {
+        viewModelScope.launch {
+            _listMemberState.value = ListMemberState.Loading
+            try {
+                val members = data_getMembers(householdId)
+                _listMemberState.value = ListMemberState.Success(members)
+            } catch (e: Exception) {
+                _listMemberState.value = ListMemberState.Error(
+                    e.localizedMessage ?: "Failed to fetch members of household $householdId"
+                )
+            }
+        }
+    }
+
+    fun resetCreateState () {
+        _createState.value = CreateState.Idle
+    }
+
+    //THIS SHOULD BE IN DATAREPO
+    suspend fun data_getMembers(householdId: String): List<HouseholdMember> {
         return try {
             Log.d("HouseholdVM", "Fetching members for household: $householdId")
             val result = client.postgrest["household_members"]
