@@ -72,7 +72,7 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        when (val state = navState) {
+        when (val navState = navState) {
             // explorer view - no household selected
             is UserProfileViewModel.NavState.Profile -> {
                 Text(text = "Profile", style = MaterialTheme.typography.headlineMedium)
@@ -80,22 +80,22 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
 
                 // handle the different state of profileUI
                 // But this will show the user profile
-                when (val state = profileUiState) {
+                when (val pState = profileUiState) {
                     // loading
                     is UserProfileViewModel.ProfileState.Loading -> {
                         CircularProgressIndicator()
                     }
                     //error
                     is UserProfileViewModel.ProfileState.Error -> {
-                        Text(text = state.message, color = Color.Red)
+                        Text(text = pState.message, color = Color.Red)
                         Button (onClick = { profileViewModel.getUserInfo() }) {
                             Text("Retry")
                         }
                     }
                     // success, we got the user info
                     is UserProfileViewModel.ProfileState.Success -> {
-                        Text(text = "Name: ${state.fullName}")
-                        Text(text = "Email: ${state.email}")
+                        Text(text = "Name: ${pState.fullName}")
+                        Text(text = "Email: ${pState.email}")
 
                         Spacer(modifier = Modifier.height(24.dp))
                         // button are inside success scope, won't appear otherwise
@@ -118,16 +118,17 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
             is UserProfileViewModel.NavState.List -> {
                 Text(text = "Your Households", style = MaterialTheme.typography.headlineMedium)
                 Spacer(modifier = Modifier.height(16.dp))
+
                 // handle household UI states
-                when (val state = householdUiState) {
-                    is householdUiState.Loading -> CircularProgressIndicator()
-                    is HouseholdUiState.Error -> Text(text = state.message, color = Color.Red)
-                    is HouseholdUiState.Success -> {
-                        if (state.households.isEmpty()) {
+                when (val hState = householdUiState) {
+                    is HouseholdViewModel.ListHouseholdState.Loading -> CircularProgressIndicator()
+                    is HouseholdViewModel.ListHouseholdState.Error -> Text(text = hState.message, color = Color.Red)
+                    is HouseholdViewModel.ListHouseholdState.Success -> {
+                        if (hState.isEmpty) {
                             Text("You are not in any households.")
                         } else {
                             LazyColumn {
-                                items(state.households) { household ->
+                                items(hState.households.size) { household ->
                                     Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
