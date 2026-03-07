@@ -8,15 +8,16 @@ import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.rpc
-import io.ktor.util.collections.StringMap
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.util.UUID
 
 @Serializable
 data class Household(
@@ -46,27 +47,25 @@ data class HouseholdMember(
 data class CreateHouseholdParams(
     @SerialName ("p_household_name")
     val householdName: String,
-    @SerialName ("p_member_id")
+    @SerialName ("p_user_id")
     val userID: String
 )
 
 class HouseholdViewModel : ViewModel() {
-    sealed class CreateState {
-        data object Idle : CreateState()
-        data object Loading : CreateState()
-        data object Success : CreateState()
-        data class Error(val message: String) : CreateState()
+    sealed class HouseholdCreateState {
+        data object Idle : HouseholdCreateState()
+        data object Loading : HouseholdCreateState()
+        data object Success : HouseholdCreateState()
+        data class Error(val message: String) : HouseholdCreateState()
     }
 
-    // this seems like it should be in its own class, specifically for seeing
-    // all of the households you're a part of, not part of a specific household screen
-    sealed class ListHouseholdState {
-        data object Idle : ListHouseholdState()
-        data object Loading : ListHouseholdState()
+    sealed class HouseholdListState {
+        data object Idle : HouseholdListState()
+        data object Loading : HouseholdListState()
         data class Success(
             val households: List<Household>,
             val isRefreshing : Boolean = false
-        ) : ListHouseholdState() {
+        ) : HouseholdListState() {
             // have isEmpty automatically set based on the houseHolds list
             val isEmpty get() = households.isEmpty()
         }
@@ -74,34 +73,77 @@ class HouseholdViewModel : ViewModel() {
             val message: String,
             // determine if they can retry (network error vs db error)
             val canRetry: Boolean = true
-        ) : ListHouseholdState()
+        ) : HouseholdListState()
     }
 
-    sealed class ListMemberState {
-        data object Idle : ListMemberState()
-        data object Loading : ListMemberState()
+    sealed class HouseholdDetailState {
+        data object Idle : HouseholdDetailState()
+        data object Loading : HouseholdDetailState()
 
-        data class Success (
-            val members : List<HouseholdMember>
-        ) : ListMemberState () {
+        data class Success(
+            val household: Household,
+            // default to empty list, gets updated by derived flow
+            val members : List<HouseholdMember> = emptyList()
+        ) : HouseholdDetailState() {
             val isEmpty get() = members.isEmpty()
         }
-        data class Error(
-            val message: String,
-        ) : ListMemberState()
+
+        // main error will be household not existing for that ID
+        data class Error(val message: String) : HouseholdDetailState()
     }
+
+    sealed class MemberAddState {
+        data object Idle : MemberAddState()
+        data object Loading : MemberAddState()
+        data object Success : MemberAddState() {
+            val message get() = "Member added successfully"
+        }
+        data class Error(val message: String) : MemberAddState() {
+            val errorMessage get() = "Failed to add member: $message"
+        }
+    }
+
+    // for navigation, no logic just states
+    sealed class NavState {
+        // for just the user profile
+        data object Idle : NavState()
+        // for when we need to list the households
+        data object List : NavState()
+        // for a specific household, with details
+        data object Detail : NavState()
+    }
+
     private val client = SupabaseClient.client
     // stateflow for the household list state
-    private val _uiState = MutableStateFlow<ListHouseholdState>(ListHouseholdState.Loading)
-    val uiState: StateFlow<ListHouseholdState> = _uiState
+    private val _householdListState = MutableStateFlow<HouseholdListState>(HouseholdListState.Loading)
+    val householdListState: StateFlow<HouseholdListState> = _householdListState
 
     //stateflow for the create state
-    private val _createState = MutableStateFlow<CreateState>(CreateState.Idle)
-    val createState: StateFlow<CreateState> = _createState
+    private val _createState = MutableStateFlow<HouseholdCreateState>(HouseholdCreateState.Idle)
+    val createState: StateFlow<HouseholdCreateState> = _createState
 
-    private val _listMemberState = MutableStateFlow<ListMemberState>(ListMemberState.Idle)
-    val listMemberState: StateFlow<ListMemberState> = _listMemberState
+    //stateflow for the detail state
+    private val _detailState = MutableStateFlow<HouseholdDetailState>(HouseholdDetailState.Idle)
+    val detailState: StateFlow<HouseholdDetailState> = _detailState
 
+    //stateflow for adding members to a household
+    private val _addMemberState = MutableStateFlow<MemberAddState>(MemberAddState.Idle)
+    val addMemberState: StateFlow<MemberAddState> = _addMemberState
+
+    //stateflow for navigation
+    private val _navState = MutableStateFlow<NavState>(NavState.Idle)
+    val navState: StateFlow<NavState> = _navState
+
+    // derived flows
+    // automatically get the current user's member record
+    // the stateIn keeps this flow active for 5 seconds after its not needed
+    // so that we don't fetch upstream on a hiccup (like screen rotation)
+    val currentUserMember: StateFlow<HouseholdMember?> = _detailState.map {
+        state -> if (state is HouseholdDetailState.Success) {
+            val currentUserId = client.auth.currentUserOrNull()?.id
+            state.members.find { it.user_id == currentUserId }
+        } else null
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
 
     init {
@@ -110,7 +152,7 @@ class HouseholdViewModel : ViewModel() {
 
     fun createHousehold(name: String) {
         viewModelScope.launch {
-            _createState.value = CreateState.Loading
+            _createState.value = HouseholdCreateState.Loading
             // THIS SHOULD GO INTO DATAREPO
             try {
                 val memberId = client.auth.currentUserOrNull()?.id
@@ -124,21 +166,21 @@ class HouseholdViewModel : ViewModel() {
                     )
                 )
 
-                _createState.value = CreateState.Success
+                _createState.value = HouseholdCreateState.Success
             } catch (e: Exception) {
-                _createState.value = CreateState.Error(e.localizedMessage ?: "Failed to create household")
+                _createState.value = HouseholdCreateState.Error(e.localizedMessage ?: "Failed to create household")
             }
         }
     }
 
     fun fetchHouseholds() {
         viewModelScope.launch {
-            _uiState.value = ListHouseholdState.Loading
+            _householdListState.value = HouseholdListState.Loading
             // THIS GOES INTO DATAREPO
             try {
                 val user = client.auth.currentUserOrNull()
                 val userId = user?.id ?: run {
-                    _uiState.value = ListHouseholdState.Error("User not authenticated")
+                    _householdListState.value = HouseholdListState.Error("User not authenticated")
                     return@launch
                 }
                 
@@ -155,7 +197,7 @@ class HouseholdViewModel : ViewModel() {
                 val householdIds = memberEntries.map { it.household_id }
                 
                 if (householdIds.isEmpty()) {
-                    _uiState.value = ListHouseholdState.Success(emptyList())
+                    _householdListState.value = HouseholdListState.Success(emptyList())
                     return@launch
                 }
 
@@ -167,31 +209,74 @@ class HouseholdViewModel : ViewModel() {
                     }.decodeList<Household>()
                 
                 Log.d("HouseholdVM", "Fetched ${households.size} households")
-                _uiState.value = ListHouseholdState.Success(households)
+                _householdListState.value = HouseholdListState.Success(households)
             } catch (e: Exception) {
                 Log.e("HouseholdVM", "Error fetching households", e)
-                _uiState.value = ListHouseholdState.Error(e.localizedMessage ?: "Failed to fetch households")
+                _householdListState.value = HouseholdListState.Error(e.localizedMessage ?: "Failed to fetch households")
             }
         }
     }
 
-
-    fun getHouseholdMembers (householdId: String) {
+    fun getHouseholdDetails(householdId: String) {
         viewModelScope.launch {
-            _listMemberState.value = ListMemberState.Loading
+            _detailState.value = HouseholdDetailState.Loading
+
             try {
-                val members = data_getMembers(householdId)
-                _listMemberState.value = ListMemberState.Success(members)
-            } catch (e: Exception) {
-                _listMemberState.value = ListMemberState.Error(
-                    e.localizedMessage ?: "Failed to fetch members of household $householdId"
+                // should be in data repo and we should be calling a function
+                val household = client.postgrest["households"]
+                    .select {
+                        filter {
+                            eq("household_id", householdId)
+                        }
+                    }.decodeList<Household>().firstOrNull()
+                // set the stateflow and nav
+                if (household != null) {
+                    _detailState.value = HouseholdDetailState.Success(household)
+                    // automatically get the members of this household
+                    getHouseholdMembers(household)
+                    // member profile is automatically fetched by dervied state flow
+                    _navState.value = NavState.Detail
+                }
+                else {
+                    _detailState.value = HouseholdDetailState.Error("Household not found")
+                }
+            }
+            catch (e: Exception) {
+                _detailState.value = HouseholdDetailState.Error(
+                    e.localizedMessage ?: "Failed to fetch household details"
                 )
             }
         }
     }
 
+    fun getHouseholdMembers (household : Household) {
+        viewModelScope.launch {
+            _detailState.value = HouseholdDetailState.Loading
+            try {
+                val members = data_getMembers(household.household_id)
+                if (!household.household_id.isEmpty()) {
+                    _detailState.value = HouseholdDetailState.Success(household, members=members)
+                }
+                else {
+                    _detailState.value = HouseholdDetailState.Error("Household not found")
+                }
+            } catch (e: Exception) {
+                _detailState.value = HouseholdDetailState.Error(
+                    e.localizedMessage ?: "Failed to fetch members of household ${household.household_id}"
+                )
+            }
+        }
+    }
+
+    fun navToListHouseholds() {
+        _navState.value = NavState.List
+    }
+
+    fun navToIdle() {
+        _navState.value = NavState.Idle
+    }
     fun resetCreateState () {
-        _createState.value = CreateState.Idle
+        _createState.value = HouseholdCreateState.Idle
     }
 
     //THIS SHOULD BE IN DATAREPO
@@ -222,11 +307,11 @@ class HouseholdViewModel : ViewModel() {
         }
     }
 
-    fun addMemberByEmail(householdId: String, email: String, onResult: (Boolean, String) -> Unit) {
+    fun addMemberByEmail(household : Household, email: String) {
         viewModelScope.launch {
             try {
                 val params = buildJsonObject {
-                    put("p_household_id", householdId)
+                    put("p_household_id", household.household_id)
                     put("p_email", email)
                 }
                 
@@ -234,11 +319,10 @@ class HouseholdViewModel : ViewModel() {
                     "add_user_to_household_by_email",
                     params
                 )
-                onResult(true, "Member added successfully")
-                // No need to fetch all households, just refresh members in the UI
+                _addMemberState.value = MemberAddState.Success
             } catch (e: Exception) {
                 Log.e("HouseholdVM", "RPC failed", e)
-                onResult(false, e.localizedMessage ?: "Failed to add member")
+                _addMemberState.value = MemberAddState.Error(e.localizedMessage ?: "Failed to add member")
             }
         }
     }

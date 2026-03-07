@@ -33,13 +33,13 @@ fun HouseholdScreen(modifier: Modifier = Modifier) {
 
     LaunchedEffect(createState) {
         when (val state = createState) {
-            is HouseholdViewModel.CreateState.Success -> {
+            is HouseholdViewModel.HouseholdCreateState.Success -> {
                 showDialog = false
                 householdName = ""
                 errorText = null
                 viewModel.resetCreateState()
             }
-            is HouseholdViewModel.CreateState.Error -> {
+            is HouseholdViewModel.HouseholdCreateState.Error -> {
                 errorText = state.message
             }
             else -> {}
@@ -58,7 +58,7 @@ fun HouseholdScreen(modifier: Modifier = Modifier) {
     if (showDialog) {
         AlertDialog(
             onDismissRequest = {
-                if (createState !is HouseholdViewModel.CreateState.Loading) {
+                if (createState !is HouseholdViewModel.HouseholdCreateState.Loading) {
                     showDialog = false
                     householdName = ""
                     errorText = null
@@ -74,7 +74,7 @@ fun HouseholdScreen(modifier: Modifier = Modifier) {
                         label = { Text("Household Name") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = createState !is HouseholdViewModel.CreateState.Loading
+                        enabled = createState !is HouseholdViewModel.HouseholdCreateState.Loading
                     )
                     errorText?.let {
                         Text(text = it, color = Color.Red)
@@ -90,9 +90,9 @@ fun HouseholdScreen(modifier: Modifier = Modifier) {
                             viewModel.createHousehold(householdName.trim())
                         }
                     },
-                    enabled = createState !is HouseholdViewModel.CreateState.Loading
+                    enabled = createState !is HouseholdViewModel.HouseholdCreateState.Loading
                 ) {
-                    if (createState is HouseholdViewModel.CreateState.Loading) {
+                    if (createState is HouseholdViewModel.HouseholdCreateState.Loading) {
                         CircularProgressIndicator()
                     } else {
                         Text("Create")
@@ -107,7 +107,7 @@ fun HouseholdScreen(modifier: Modifier = Modifier) {
                         errorText = null
                         viewModel.resetCreateState()
                     },
-                    enabled = createState !is HouseholdViewModel.CreateState.Loading
+                    enabled = createState !is HouseholdViewModel.HouseholdCreateState.Loading
                 ) {
                     Text("Cancel")
                 }

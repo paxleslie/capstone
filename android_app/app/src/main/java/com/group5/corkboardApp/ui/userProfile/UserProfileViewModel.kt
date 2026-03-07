@@ -32,23 +32,11 @@ class UserProfileViewModel : ViewModel() {
         ) : ProfileState()
     }
 
-    // for navigation, no logic just states
-    sealed class NavState {
-        // for just the user profile
-        data object Profile : NavState()
-        // for when we need to list the households
-        data object List : NavState()
-        // for a specific household, with details
-        data object Detail : NavState()
-    }
 
     // use client for anything to do with supabase
     private val client = SupabaseClient.client
     private val _uiState = MutableStateFlow<ProfileState>(ProfileState.Loading)
     val uiState: StateFlow<ProfileState> = _uiState
-    // stateflow for the navigation state
-    private val _navState = MutableStateFlow<NavState>(NavState.Profile)
-    val navState: StateFlow<NavState> = _navState
 
     // get the user info from supabase
     fun getUserInfo() {
@@ -98,18 +86,5 @@ class UserProfileViewModel : ViewModel() {
             // this goes into authRepo
             client.auth.signOut()
         }
-    }
-
-    fun navToListHouseholds() {
-        _navState.value = NavState.List
-    }
-
-    fun navToProfile() {
-        _navState.value = NavState.Profile
-    }
-
-    fun navToDetail() {
-        //will need to figure out how to get detailed household view - probably not here though
-        _navState.value = NavState.Detail
     }
 }
