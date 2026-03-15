@@ -19,6 +19,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+// these should go into models object
 @Serializable
 data class Household(
     val household_id: String,
@@ -188,7 +189,7 @@ class HouseholdViewModel : ViewModel() {
                     return@launch
                 }
                 
-                Log.d("HouseholdVM", "Fetching households for user_id: $userId")
+                Log.d(TAG, "Fetching households for user_id: $userId")
                 
                 val memberEntries = client.postgrest["household_members"]
                     .select {
@@ -197,7 +198,7 @@ class HouseholdViewModel : ViewModel() {
                         }
                     }.decodeList<HouseholdMember>()
                 
-                Log.d("HouseholdVM", "Found ${memberEntries.size} membership entries")
+                Log.d(TAG, "Found ${memberEntries.size} membership entries")
                 val householdIds = memberEntries.map { it.household_id }
                 
                 if (householdIds.isEmpty()) {
@@ -212,10 +213,10 @@ class HouseholdViewModel : ViewModel() {
                         }
                     }.decodeList<Household>()
                 
-                Log.d("HouseholdVM", "Fetched ${households.size} households")
+                Log.d(TAG, "Fetched ${households.size} households")
                 _householdListState.value = HouseholdListState.Success(households)
             } catch (e: Exception) {
-                Log.e("HouseholdVM", "Error fetching households", e)
+                Log.e(TAG, "Error fetching households", e)
                 _householdListState.value = HouseholdListState.Error(e.localizedMessage ?: "Failed to fetch households")
             }
         }
@@ -286,17 +287,17 @@ class HouseholdViewModel : ViewModel() {
     //THIS SHOULD BE IN DATAREPO
     suspend fun data_getMembers(householdId: String): List<HouseholdMember> {
         return try {
-            Log.d("HouseholdVM", "Fetching members for household: $householdId")
+            Log.d(TAG, "Fetching members for household: $householdId")
             val result = client.postgrest["household_members"]
                 .select(Columns.raw("*, profiles(display_name, full_name, email)")) {
                     filter {
                         eq("household_id", householdId)
                     }
                 }.decodeList<HouseholdMember>()
-            Log.d("HouseholdVM", "Found ${result.size} members")
+            Log.d(TAG, "Found ${result.size} members")
             result
         } catch (e: Exception) {
-            Log.e("HouseholdVM", "Join query failed, trying simple query", e)
+            Log.e(TAG, "Join query failed, trying simple query", e)
             try {
                 client.postgrest["household_members"]
                     .select {
@@ -305,7 +306,7 @@ class HouseholdViewModel : ViewModel() {
                         }
                     }.decodeList<HouseholdMember>()
             } catch (e2: Exception) {
-                Log.e("HouseholdVM", "Simple query also failed", e2)
+                Log.e(TAG, "Simple query also failed", e2)
                 emptyList()
             }
         }
@@ -325,7 +326,7 @@ class HouseholdViewModel : ViewModel() {
                 )
                 _addMemberState.value = MemberAddState.Success
             } catch (e: Exception) {
-                Log.e("HouseholdVM", "RPC failed", e)
+                Log.e(TAG, "RPC failed", e)
                 _addMemberState.value = MemberAddState.Error(e.localizedMessage ?: "Failed to add member")
             }
         }
