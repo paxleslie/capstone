@@ -113,6 +113,8 @@ class HouseholdViewModel : ViewModel() {
         data object Detail : NavState()
     }
 
+    private val TAG = "HouseholdViewModel"
+
     private val client = SupabaseClient.client
     // stateflow for the household list state
     private val _householdListState = MutableStateFlow<HouseholdListState>(HouseholdListState.Loading)
@@ -155,20 +157,22 @@ class HouseholdViewModel : ViewModel() {
             _createState.value = HouseholdCreateState.Loading
             // THIS SHOULD GO INTO DATAREPO
             try {
+                // make sure we have an authenticated user logged in
                 val memberId = client.auth.currentUserOrNull()?.id
                     ?: throw Exception("User not authenticated")
 
-                client.postgrest.rpc(
+                val newHouseholdId = client.postgrest.rpc(
                     "create_household",
                     CreateHouseholdParams(
                         householdName = name,
                         userID = memberId
                     )
                 )
-
+                Log.d(TAG, "Created household with ID: ${newHouseholdId.data}")
                 _createState.value = HouseholdCreateState.Success
             } catch (e: Exception) {
-                _createState.value = HouseholdCreateState.Error(e.localizedMessage ?: "Failed to create household")
+                _createState.value = HouseholdCreateState.Error(e.message ?: "Failed to create household")
+                Log.e(TAG, "Failed to create household: ${e.message}", e)
             }
         }
     }
