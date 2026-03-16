@@ -199,13 +199,18 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                                     key = { it.member_id }
                                 ) { member ->
                                     Column(modifier = Modifier.padding(vertical = 8.dp)) {
-                                        val profile = member.profiles
-                                        val nameToShow = profile?.display_name ?: profile?.full_name ?: profile?.email ?: "User (${member.user_id.take(8)}...)"
+                                        val profile = member.profile
+                                        val nameToShow = profile?.name ?: profile?.email ?: "User (${member.user_id.take(8)}...)"
                                         Text(text = nameToShow)
                                         Text(text = "Role: ${member.role}", style = MaterialTheme.typography.bodySmall)
                                         HorizontalDivider()
                                     }
                                 }
+                            }
+                            Button(
+                                onClick= { householdViewModel.navToIdle() }
+                            ) {
+                                Text("Back to Households")
                             }
                         }
                     }

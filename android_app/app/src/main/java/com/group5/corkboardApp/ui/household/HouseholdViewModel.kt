@@ -31,7 +31,7 @@ data class Household(
 @Serializable
 data class Profile(
     val display_name: String? = null,
-    val full_name: String? = null,
+    val name: String? = null,
     val email: String? = null
 )
 
@@ -41,7 +41,9 @@ data class HouseholdMember(
     val user_id: String,
     val household_id: String,
     val role: String,
-    val profiles: Profile? = null
+    // the actual table is called users
+    @SerialName("users")
+    val profile: Profile? = null
 )
 
 @Serializable
@@ -274,6 +276,7 @@ class HouseholdViewModel : ViewModel() {
     }
 
     fun navToListHouseholds() {
+        fetchHouseholds()
         _navState.value = NavState.List
     }
 
@@ -289,12 +292,14 @@ class HouseholdViewModel : ViewModel() {
         return try {
             Log.d(TAG, "Fetching members for household: $householdId")
             val result = client.postgrest["household_members"]
-                .select(Columns.raw("*, profiles(display_name, full_name, email)")) {
+                .select(Columns.raw("*, users(display_name, name, email)")) {
                     filter {
                         eq("household_id", householdId)
                     }
                 }.decodeList<HouseholdMember>()
             Log.d(TAG, "Found ${result.size} members")
+            // debug to list all found members
+            Log.d(TAG, "Found members: $result")
             result
         } catch (e: Exception) {
             Log.e(TAG, "Join query failed, trying simple query", e)
@@ -317,7 +322,7 @@ class HouseholdViewModel : ViewModel() {
             try {
                 val params = buildJsonObject {
                     put("p_household_id", household.household_id)
-                    put("p_email", email)
+                    put("p_new_member_email", email)
                 }
                 
                 client.postgrest.rpc(

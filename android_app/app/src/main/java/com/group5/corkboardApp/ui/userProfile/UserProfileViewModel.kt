@@ -55,7 +55,7 @@ class UserProfileViewModel : ViewModel() {
                     val userId = user.id
                     val email = user.email
 
-                    val fullName = user.userMetadata?.get("full_name")?.jsonPrimitive?.content
+                    val fullName = user.userMetadata?.get("name")?.jsonPrimitive?.content
                     // make sure these have values
                     if (fullName == null) {
                         _uiState.value = ProfileState.Error("User info not available")
