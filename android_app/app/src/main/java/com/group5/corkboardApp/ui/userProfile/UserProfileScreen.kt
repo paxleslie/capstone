@@ -48,6 +48,9 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
     val profileViewModel : UserProfileViewModel = viewModel()
     val profileUiState by profileViewModel.uiState.collectAsState()
 
+    // Observe the state of remove, leave, and delete household actions
+    val actionState by householdViewModel.actionState.collectAsState()
+
     // we tell the viewmodel to get the userinfo
     // in LaunchedEffect so that it only runs once
     LaunchedEffect(Unit) {
@@ -161,14 +164,39 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                         var emailToAdd by remember { mutableStateOf("")}
                         var isAdding by remember { mutableStateOf(false) }
 
+                        // Check whether the current user is an admin of this household
+                        val isAdmin = currentMemberState?.role?.equals("admin", ignoreCase = true) == true
+
+                        // Store current user's id to prevent showing remove button on themselves
+                        val currentUserId = currentMemberState?.user_id
+
                         Column(modifier = Modifier.fillMaxSize()) {
                             Text(text = dState.household.household_name, style = MaterialTheme.typography.headlineMedium)
                             // list out user's member role
                             Text(text = "Your Role: ${currentMemberState?.role}", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
                             Spacer(modifier = Modifier.height(8.dp))
 
+                            // Show success or error messages for household actions
+                            when (val aState = actionState) {
+                                is HouseholdViewModel.HouseholdActionState.Error -> {
+                                    Text(
+                                        text = aState.message,
+                                        color = Color.Red,
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    )
+                                }
+                                is HouseholdViewModel.HouseholdActionState.Success -> {
+                                    Text(
+                                        text = aState.message,
+                                        color = Color.Gray,
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    )
+                                }
+                                else -> {}
+                            }
+
                             // admin panel for adding new users
-                            if (currentMemberState?.role?.equals("admin", ignoreCase = true) == true) {
+                            if (isAdmin) {
                                 Spacer(modifier = Modifier.height(16.dp))
                                 OutlinedTextField(
                                     value = emailToAdd,
@@ -192,7 +220,7 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                                 }
                             }
 
-                            // list current members of this houshold
+                            // List current members of this household
                             LazyColumn(modifier = Modifier.weight(1f)) {
                                 items(
                                     items = dState.members,
@@ -201,14 +229,59 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                                     Column(modifier = Modifier.padding(vertical = 8.dp)) {
                                         val profile = member.profile
                                         val nameToShow = profile?.name ?: profile?.email ?: "User (${member.user_id.take(8)}...)"
+
                                         Text(text = nameToShow)
-                                        Text(text = "Role: ${member.role}", style = MaterialTheme.typography.bodySmall)
+                                        Text(
+                                            text = "Role: ${member.role}",
+                                            style = MaterialTheme.typography.bodySmall
+                                        )
+
+                                        // Only admins can remove other users from the household
+                                        if (isAdmin && member.user_id != currentUserId) {
+                                            Button(
+                                                onClick = {
+                                                    householdViewModel.removeMember(
+                                                        dState.household,
+                                                        member.user_id
+                                                    )
+                                                },
+                                                modifier = Modifier.padding(top = 4.dp)
+                                            ) {
+                                                Text("Remove User")
+                                            }
+                                        }
+
                                         HorizontalDivider()
                                     }
                                 }
                             }
-                            Button(
-                                onClick= { householdViewModel.navToIdle() }
+                            // Admins can delete the household, while regular users can leave it
+                            if (isAdmin) {
+                                Button(
+                                    onClick = {
+                                        householdViewModel.deleteHousehold(dState.household)
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Delete Household")
+                                }
+                            } else {
+                                Button(
+                                    onClick = {
+                                        householdViewModel.leaveHousehold(dState.household)
+                                    },
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Leave Household")
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Navigate back to the household list view
+                            TextButton(
+                                onClick = { householdViewModel.navToListHouseholds() },
+                                modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text("Back to Households")
                             }
