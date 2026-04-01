@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -19,7 +21,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import com.group5.corkboardApp.util.SupabaseClient
@@ -33,6 +39,28 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToSignup: () -> Unit) {
     var password by remember { mutableStateOf("") }
     var errorText by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val focusManager = LocalFocusManager.current
+
+    val onLoginClick = {
+        scope.launch {
+            val trimmedEmail = email.trim()
+            val trimmedPassword = password.trim()
+            
+            if (trimmedEmail.isEmpty() || trimmedPassword.isEmpty()) {
+                errorText = "Email and password cannot be empty"
+            } else {
+                try {
+                    SupabaseClient.client.auth.signInWith(Email) {
+                        this.email = trimmedEmail
+                        this.password = trimmedPassword
+                    }
+                    onLoginSuccess()
+                } catch (e: Exception) {
+                    errorText = e.localizedMessage ?: "Login failed"
+                }
+            }
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -47,14 +75,33 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToSignup: () -> Unit) {
         OutlinedTextField(
             value = email,
             onValueChange = { email = it },
-            label = { Text("Email") }
+            label = { Text("Email") },
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Email,
+                imeAction = ImeAction.Next
+            ),
+            keyboardActions = KeyboardActions(
+                onNext = { focusManager.moveFocus(FocusDirection.Down) }
+            ),
+            singleLine = true
         )
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
             value = password,
             onValueChange = { password = it },
             label = { Text("Password") },
-            visualTransformation = PasswordVisualTransformation()
+            visualTransformation = PasswordVisualTransformation(),
+            keyboardOptions = KeyboardOptions(
+                keyboardType = KeyboardType.Password,
+                imeAction = ImeAction.Done
+            ),
+            keyboardActions = KeyboardActions(
+                onDone = { 
+                    focusManager.clearFocus()
+                    onLoginClick()
+                }
+            ),
+            singleLine = true
         )
         
         errorText?.let {
@@ -63,27 +110,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToSignup: () -> Unit) {
         }
         
         Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = {
-            scope.launch {
-                val trimmedEmail = email.trim()
-                val trimmedPassword = password.trim()
-                
-                if (trimmedEmail.isEmpty() || trimmedPassword.isEmpty()) {
-                    errorText = "Email and password cannot be empty"
-                    return@launch
-                }
-
-                try {
-                    SupabaseClient.client.auth.signInWith(Email) {
-                        this.email = trimmedEmail
-                        this.password = trimmedPassword
-                    }
-                    onLoginSuccess()
-                } catch (e: Exception) {
-                    errorText = e.localizedMessage ?: "Login failed"
-                }
-            }
-        }) {
+        Button(onClick = { onLoginClick() }) {
             Text("Login")
         }
 

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -23,7 +24,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.group5.corkboardApp.util.SupabaseClient
 import io.github.jan.supabase.auth.auth
@@ -31,6 +37,39 @@ import io.github.jan.supabase.auth.providers.builtin.Email
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+
+class PhoneVisualTransformation : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        // Only keep digits
+        val digits = text.text.filter { it.isDigit() }
+        val out = StringBuilder()
+        
+        for (i in digits.indices) {
+            out.append(digits[i])
+            if (i == 2 || i == 5) out.append("-")
+        }
+        
+        val formattedText = out.toString().take(12)
+        
+        val offsetMapping = object : OffsetMapping {
+            override fun originalToTransformed(offset: Int): Int {
+                if (offset <= 3) return offset
+                if (offset <= 6) return offset + 1
+                if (offset <= 10) return offset + 2
+                return formattedText.length
+            }
+
+            override fun transformedToOriginal(offset: Int): Int {
+                if (offset <= 3) return offset
+                if (offset <= 7) return offset - 1
+                if (offset <= 12) return offset - 2
+                return 10
+            }
+        }
+
+        return TransformedText(AnnotatedString(formattedText), offsetMapping)
+    }
+}
 
 @Composable
 fun SignupScreen(onSignupSuccess: () -> Unit, onBackToLogin: () -> Unit) {
@@ -71,8 +110,15 @@ fun SignupScreen(onSignupSuccess: () -> Unit, onBackToLogin: () -> Unit) {
 
         OutlinedTextField(
             value = phoneNumber,
-            onValueChange = { phoneNumber = it },
-            label = { Text("Phone Number") }
+            onValueChange = { input ->
+                val digitsOnly = input.filter { it.isDigit() }
+                if (digitsOnly.length <= 10) {
+                    phoneNumber = digitsOnly
+                }
+            },
+            label = { Text("Phone Number") },
+            visualTransformation = PhoneVisualTransformation(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
         )
         Spacer(modifier = Modifier.height(8.dp))
 
