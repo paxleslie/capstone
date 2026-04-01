@@ -58,11 +58,11 @@ data class CreateHouseholdParams(
 @Serializable
 data class RemoveMemberParams(
     // Household to remove the user from
-    @SerialName("p_household_id")
+    @SerialName("householdid")
     val householdId: String,
 
     // The user being removed
-    @SerialName("p_target_user_id")
+    @SerialName("userid")
     val targetUserId: String
 )
 
