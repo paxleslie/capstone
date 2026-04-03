@@ -96,10 +96,24 @@ class AccountSettingsViewModel : ViewModel() {
         viewModelScope.launch {
             _updateStatus.value = UpdateState.Loading
             try {
+                val userId = client.auth.currentUserOrNull()?.id ?: throw Exception("Not logged in")
+
+                // 1. Update Authentication Table
                 client.auth.updateUser {
                     email = newEmail
                 }
+
+                // 2. Update Public Users Table
+                client.postgrest["users"].update(
+                    {
+                        set("email", newEmail)
+                    }
+                ) {
+                    filter { eq("user_id", userId) }
+                }
+
                 _updateStatus.value = UpdateState.Success("Email update started. Check your new email for confirmation.")
+                loadCurrentUserData() // Refresh data
             } catch (e: Exception) {
                 _updateStatus.value = UpdateState.Error(e.localizedMessage ?: "Email update failed")
             }
