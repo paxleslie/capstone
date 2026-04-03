@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.group5.corkboardApp.util.SupabaseClient
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.providers.builtin.Email
 import io.github.jan.supabase.postgrest.postgrest
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -29,11 +30,22 @@ class AccountSettingsViewModel : ViewModel() {
     private val _currentUserData = MutableStateFlow<UserSettings>(UserSettings())
     val currentUserData: StateFlow<UserSettings> = _currentUserData
 
+    private val _passwordVerificationStatus = MutableStateFlow<PasswordVerificationState>(PasswordVerificationStatus.Idle)
+    val passwordVerificationStatus: StateFlow<PasswordVerificationState> = _passwordVerificationStatus
+
     sealed class UpdateState {
         object Idle : UpdateState()
         object Loading : UpdateState()
         data class Success(val message: String) : UpdateState()
         data class Error(val message: String) : UpdateState()
+    }
+
+    interface PasswordVerificationState
+    object PasswordVerificationStatus {
+        object Idle : PasswordVerificationState
+        object Loading : PasswordVerificationState
+        object Success : PasswordVerificationState
+        data class Error(val message: String) : PasswordVerificationState
     }
 
     init {
@@ -120,6 +132,22 @@ class AccountSettingsViewModel : ViewModel() {
         }
     }
 
+    fun verifyCurrentPassword(password: String) {
+        viewModelScope.launch {
+            _passwordVerificationStatus.value = PasswordVerificationStatus.Loading
+            try {
+                val email = client.auth.currentUserOrNull()?.email ?: throw Exception("Not logged in")
+                client.auth.signInWith(Email) {
+                    this.email = email
+                    this.password = password
+                }
+                _passwordVerificationStatus.value = PasswordVerificationStatus.Success
+            } catch (e: Exception) {
+                _passwordVerificationStatus.value = PasswordVerificationStatus.Error("Incorrect current password")
+            }
+        }
+    }
+
     fun updatePassword(newPassword: String) {
         viewModelScope.launch {
             _updateStatus.value = UpdateState.Loading
@@ -128,10 +156,15 @@ class AccountSettingsViewModel : ViewModel() {
                     password = newPassword
                 }
                 _updateStatus.value = UpdateState.Success("Password updated successfully")
+                resetPasswordVerification()
             } catch (e: Exception) {
                 _updateStatus.value = UpdateState.Error(e.localizedMessage ?: "Password update failed")
             }
         }
+    }
+
+    fun resetPasswordVerification() {
+        _passwordVerificationStatus.value = PasswordVerificationStatus.Idle
     }
 
     fun signOut() {

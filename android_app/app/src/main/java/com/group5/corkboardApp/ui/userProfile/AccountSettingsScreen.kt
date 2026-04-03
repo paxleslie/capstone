@@ -8,9 +8,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -29,9 +32,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -78,14 +84,17 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
     val viewModel: AccountSettingsViewModel = viewModel()
     val updateStatus by viewModel.updateStatus.collectAsState()
     val currentUserData by viewModel.currentUserData.collectAsState()
+    val passwordVerificationStatus by viewModel.passwordVerificationStatus.collectAsState()
     
     val snackbarHostState = remember { SnackbarHostState() }
+    val focusManager = LocalFocusManager.current
     
     var name by remember { mutableStateOf("") }
     var displayName by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
+    
+    var showPasswordDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(currentUserData) {
         name = currentUserData.name
@@ -100,6 +109,7 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
             is AccountSettingsViewModel.UpdateState.Success -> {
                 snackbarHostState.showSnackbar(state.message)
                 viewModel.resetStatus()
+                showPasswordDialog = false
             }
             is AccountSettingsViewModel.UpdateState.Error -> {
                 snackbarHostState.showSnackbar(state.message)
@@ -143,14 +153,24 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                         value = name, 
                         onValueChange = { name = it }, 
                         label = { Text("Full Name") }, 
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = KeyboardActions(
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                        )
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = displayName, 
                         onValueChange = { displayName = it }, 
                         label = { Text("Display Name") }, 
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = KeyboardActions(
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                        )
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
@@ -164,10 +184,25 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                         label = { Text("Phone Number") }, 
                         modifier = Modifier.fillMaxWidth(),
                         visualTransformation = PhoneVisualTransformation(),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                if (name.isNotBlank() || displayName.isNotBlank() || phone.isNotBlank()) {
+                                    focusManager.clearFocus()
+                                    viewModel.updateProfile(name, displayName, phone)
+                                }
+                            }
+                        ),
+                        singleLine = true
                     )
                     Button(
-                        onClick = { viewModel.updateProfile(name, displayName, phone) },
+                        onClick = { 
+                            focusManager.clearFocus()
+                            viewModel.updateProfile(name, displayName, phone) 
+                        },
                         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                         enabled = name.isNotBlank() || displayName.isNotBlank() || phone.isNotBlank()
                     ) {
@@ -189,10 +224,26 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                         value = email, 
                         onValueChange = { email = it }, 
                         label = { Text("New Email") }, 
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Email,
+                            imeAction = ImeAction.Done
+                        ),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                if (email.isNotBlank()) {
+                                    focusManager.clearFocus()
+                                    viewModel.updateEmail(email)
+                                }
+                            }
+                        )
                     )
                     Button(
-                        onClick = { viewModel.updateEmail(email) },
+                        onClick = { 
+                            focusManager.clearFocus()
+                            viewModel.updateEmail(email) 
+                        },
                         modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
                         enabled = email.isNotBlank()
                     ) {
@@ -201,28 +252,23 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                 }
             }
 
-            // Password Section
+            // Password Section - Just a button now
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "Update Password", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(text = "Security", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedTextField(
-                        value = password, 
-                        onValueChange = { password = it }, 
-                        label = { Text("New Password") }, 
-                        modifier = Modifier.fillMaxWidth(),
-                        visualTransformation = PasswordVisualTransformation()
-                    )
                     Button(
-                        onClick = { viewModel.updatePassword(password) },
-                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                        enabled = password.length >= 6
+                        onClick = { 
+                            viewModel.resetPasswordVerification()
+                            showPasswordDialog = true 
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("Update Password")
+                        Text("Change Password")
                     }
                 }
             }
@@ -232,7 +278,8 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
             // Logout Section
             Button(
                 onClick = { viewModel.signOut() },
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Red, contentColor = Color.White)
             ) {
                 Text("Log Out")
             }
@@ -250,4 +297,162 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
             }
         }
     }
+
+    if (showPasswordDialog) {
+        ChangePasswordDialog(
+            verificationStatus = passwordVerificationStatus,
+            onVerify = { viewModel.verifyCurrentPassword(it) },
+            onUpdate = { viewModel.updatePassword(it) },
+            onDismiss = { 
+                showPasswordDialog = false
+                viewModel.resetPasswordVerification()
+            }
+        )
+    }
+}
+
+@Composable
+fun ChangePasswordDialog(
+    verificationStatus: AccountSettingsViewModel.PasswordVerificationState,
+    onVerify: (String) -> Unit,
+    onUpdate: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var currentPassword by remember { mutableStateOf("") }
+    var newPassword by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    
+    val focusManager = LocalFocusManager.current
+
+    // Validation rules
+    val isMinLength = newPassword.length >= 6
+    val hasLetter = newPassword.any { it.isLetter() }
+    val hasDigit = newPassword.any { it.isDigit() }
+    val isPasswordValid = isMinLength && hasLetter && hasDigit
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Change Password") },
+        text = {
+            Column {
+                when (verificationStatus) {
+                    is AccountSettingsViewModel.PasswordVerificationStatus.Success -> {
+                        Text(
+                            text = "New Password Rules:",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "• At least 6 characters\n• At least one letter\n• At least one number",
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        
+                        OutlinedTextField(
+                            value = newPassword,
+                            onValueChange = { newPassword = it },
+                            label = { Text("New Password") },
+                            modifier = Modifier.fillMaxWidth(),
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Password,
+                                imeAction = ImeAction.Next
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onNext = { focusManager.moveFocus(FocusDirection.Down) }
+                            ),
+                            singleLine = true
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = confirmPassword,
+                            onValueChange = { confirmPassword = it },
+                            label = { Text("Confirm New Password") },
+                            modifier = Modifier.fillMaxWidth(),
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Password,
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = { 
+                                    if (isPasswordValid && newPassword == confirmPassword) {
+                                        onUpdate(newPassword)
+                                    }
+                                }
+                            ),
+                            singleLine = true
+                        )
+                        if (newPassword.isNotBlank() && confirmPassword.isNotBlank() && newPassword != confirmPassword) {
+                            Text(
+                                text = "The passwords do not match",
+                                color = Color.Red,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
+                    else -> {
+                        Text("Please enter your current password to continue.")
+                        Spacer(modifier = Modifier.height(8.dp))
+                        OutlinedTextField(
+                            value = currentPassword,
+                            onValueChange = { currentPassword = it },
+                            label = { Text("Current Password") },
+                            modifier = Modifier.fillMaxWidth(),
+                            visualTransformation = PasswordVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Password,
+                                imeAction = ImeAction.Done
+                            ),
+                            keyboardActions = KeyboardActions(
+                                onDone = { 
+                                    if (currentPassword.isNotBlank()) {
+                                        onVerify(currentPassword)
+                                    }
+                                }
+                            ),
+                            singleLine = true
+                        )
+                        if (verificationStatus is AccountSettingsViewModel.PasswordVerificationStatus.Error) {
+                            Text(
+                                text = (verificationStatus as AccountSettingsViewModel.PasswordVerificationStatus.Error).message,
+                                color = Color.Red,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            when (verificationStatus) {
+                is AccountSettingsViewModel.PasswordVerificationStatus.Success -> {
+                    Button(
+                        onClick = { onUpdate(newPassword) },
+                        enabled = isPasswordValid && newPassword == confirmPassword
+                    ) {
+                        Text("Update")
+                    }
+                }
+                is AccountSettingsViewModel.PasswordVerificationStatus.Loading -> {
+                    CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
+                }
+                else -> {
+                    Button(
+                        onClick = { onVerify(currentPassword) },
+                        enabled = currentPassword.isNotBlank()
+                    ) {
+                        Text("Next")
+                    }
+                }
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
