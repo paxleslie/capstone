@@ -69,7 +69,7 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            when (val navState = navState) {
+            when (val navStateValue = navState) {
                 // profile view - no household selected
                 is HouseholdViewModel.NavState.Idle -> {
                     Text(text = "Profile", style = MaterialTheme.typography.headlineMedium)
@@ -90,8 +90,8 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                         }
                         // success, we got the user info
                         is UserProfileViewModel.ProfileState.Success -> {
-                            Text(text = "Name: ${pState.fullName}")
-                            Text(text = "Email: ${pState.email}")
+                            Text(text = pState.displayName, style = MaterialTheme.typography.titleLarge)
+                            Text(text = pState.email, style = MaterialTheme.typography.bodyMedium)
 
                             Spacer(modifier = Modifier.height(24.dp))
                             // button are inside success scope, won't appear otherwise
