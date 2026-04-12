@@ -273,7 +273,7 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                                 } else {
                                     Button(
                                         onClick = {
-                                            householdViewModel.leaveHousehold(dState.household)
+                                            householdViewModel.leaveHousehold(dState.household, currentMemberState?.member_id ?: "")
                                         },
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
