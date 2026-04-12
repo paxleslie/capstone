@@ -242,7 +242,7 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                                                 onClick = {
                                                     householdViewModel.removeMember(
                                                         dState.household,
-                                                        member.user_id
+                                                        member.member_id
                                                     )
                                                 },
                                                 modifier = Modifier.padding(top = 4.dp)
@@ -268,7 +268,9 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                             } else {
                                 Button(
                                     onClick = {
-                                        householdViewModel.leaveHousehold(dState.household)
+                                        currentMemberState?.member_id?.let { memberId ->
+                                            householdViewModel.leaveHousehold(dState.household, memberId)
+                                        }
                                     },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {

@@ -58,11 +58,11 @@ data class CreateHouseholdParams(
 @Serializable
 data class RemoveMemberParams(
     // Household to remove the user from
-    @SerialName("p_household_id")
+    @SerialName("householdid")
     val householdId: String,
 
     // The user being removed
-    @SerialName("p_target_user_id")
+    @SerialName("userid")
     val targetUserId: String
 )
 
@@ -447,24 +447,19 @@ class HouseholdViewModel : ViewModel() {
         }
     }
 
-    // Allows the current user to leave a household by removing their own membership
-    fun leaveHousehold(household: Household) {
+    // Allows the current user to leave a household by removing their own membership row
+    fun leaveHousehold(household: Household, memberId: String) {
         viewModelScope.launch {
             // Set action state to loading while the request is being processed
             _actionState.value = HouseholdActionState.Loading
 
             try {
-                // Get the currently authenticated user
-                val currentUserId = client.auth.currentUserOrNull()?.id
-                    ?: throw Exception("User not authenticated")
-
                 // Call the same database RPC used for removing members
-                // RLS rules should allow a regular user to remove only themselves
                 client.postgrest.rpc(
                     "remove_household_member",
                     RemoveMemberParams(
                         householdId = household.household_id,
-                        targetUserId = currentUserId
+                        targetUserId = memberId
                     )
                 )
 
