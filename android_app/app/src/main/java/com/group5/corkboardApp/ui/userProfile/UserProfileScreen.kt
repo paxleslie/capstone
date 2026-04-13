@@ -8,6 +8,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -28,6 +30,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.group5.corkboardApp.ui.household.HouseholdViewModel
@@ -53,6 +58,8 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
 
     val addMemberState by householdViewModel.addMemberState.collectAsState()
     var emailToAdd by remember { mutableStateOf("")}
+    
+    val focusManager = LocalFocusManager.current
 
     LaunchedEffect(Unit) {
         profileViewModel.getUserInfo()
@@ -202,11 +209,25 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                                         onValueChange = { emailToAdd = it },
                                         label = { Text("Add member by email") },
                                         modifier = Modifier.fillMaxWidth(),
-                                        enabled = addMemberState !is HouseholdViewModel.MemberAddState.Loading
+                                        enabled = addMemberState !is HouseholdViewModel.MemberAddState.Loading,
+                                        singleLine = true,
+                                        keyboardOptions = KeyboardOptions(
+                                            keyboardType = KeyboardType.Email,
+                                            imeAction = ImeAction.Done
+                                        ),
+                                        keyboardActions = KeyboardActions(
+                                            onDone = {
+                                                if (emailToAdd.isNotBlank()) {
+                                                    focusManager.clearFocus()
+                                                    householdViewModel.addMemberByEmail(dState.household, emailToAdd.trim())
+                                                }
+                                            }
+                                        )
                                     )
                                     Button(
                                         onClick = {
                                             if (emailToAdd.isNotBlank()) {
+                                                focusManager.clearFocus()
                                                 householdViewModel.addMemberByEmail(dState.household, emailToAdd.trim())
                                             }
                                         },
@@ -309,7 +330,16 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                         label = { Text("Household Name") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
-                        enabled = createState !is HouseholdViewModel.HouseholdCreateState.Loading
+                        enabled = createState !is HouseholdViewModel.HouseholdCreateState.Loading,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                if (newHouseholdName.isNotBlank()) {
+                                    focusManager.clearFocus()
+                                    householdViewModel.createHousehold(newHouseholdName.trim())
+                                }
+                            }
+                        )
                     )
                     createErrorText?.let {
                         Text(text = it, color = Color.Red)
@@ -322,6 +352,7 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                         if (newHouseholdName.isBlank()) {
                             createErrorText = "Please enter a household name"
                         } else {
+                            focusManager.clearFocus()
                             householdViewModel.createHousehold(newHouseholdName.trim())
                         }
                     },
