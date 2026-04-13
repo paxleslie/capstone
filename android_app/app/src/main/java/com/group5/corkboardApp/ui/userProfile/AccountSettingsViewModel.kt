@@ -2,36 +2,16 @@ package com.group5.corkboardApp.ui.userProfile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.group5.corkboardApp.util.SupabaseClient
-import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.auth.providers.builtin.Email
-import io.github.jan.supabase.postgrest.postgrest
+import com.group5.corkboardApp.data.model.UserProfile
+import com.group5.corkboardApp.data.repository.AuthRepository
+import com.group5.corkboardApp.data.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
-@Serializable
-data class UserSettings(
-    val name: String = "",
-    val display_name: String = "",
-    val phone: String = "",
-    val email: String = ""
-)
-
 class AccountSettingsViewModel : ViewModel() {
-    private val client = SupabaseClient.client
-
-    private val _updateStatus = MutableStateFlow<UpdateState>(UpdateState.Idle)
-    val updateStatus: StateFlow<UpdateState> = _updateStatus
-
-    private val _currentUserData = MutableStateFlow<UserSettings>(UserSettings())
-    val currentUserData: StateFlow<UserSettings> = _currentUserData
-
-    private val _passwordVerificationStatus = MutableStateFlow<PasswordVerificationState>(PasswordVerificationStatus.Idle)
-    val passwordVerificationStatus: StateFlow<PasswordVerificationState> = _passwordVerificationStatus
 
     sealed class UpdateState {
         object Idle : UpdateState()
@@ -48,6 +28,16 @@ class AccountSettingsViewModel : ViewModel() {
         data class Error(val message: String) : PasswordVerificationState
     }
 
+    private val _updateStatus = MutableStateFlow<UpdateState>(UpdateState.Idle)
+    val updateStatus: StateFlow<UpdateState> = _updateStatus
+
+    private val _currentUserData = MutableStateFlow<UserProfile>(UserProfile())
+    val currentUserData: StateFlow<UserProfile> = _currentUserData
+
+    private val _passwordVerificationStatus =
+        MutableStateFlow<PasswordVerificationState>(PasswordVerificationStatus.Idle)
+    val passwordVerificationStatus: StateFlow<PasswordVerificationState> = _passwordVerificationStatus
+
     init {
         loadCurrentUserData()
     }
@@ -55,18 +45,12 @@ class AccountSettingsViewModel : ViewModel() {
     private fun loadCurrentUserData() {
         viewModelScope.launch {
             try {
-                val user = client.auth.currentUserOrNull()
-                val userId = user?.id ?: return@launch
-                val email = user.email ?: ""
-                
-                val userData = client.postgrest["users"].select {
-                    filter { eq("user_id", userId) }
-                }.decodeSingle<UserSettings>()
-                
-                _currentUserData.value = userData.copy(email = email)
+                val user = AuthRepository.currentUser() ?: return@launch
+                val userProfile = UserRepository.getUserProfile(user.id)
+                _currentUserData.value = userProfile.copy(email = user.email ?: userProfile.email)
             } catch (e: Exception) {
-                // If fetching from DB fails, at least try to get email from Auth
-                client.auth.currentUserOrNull()?.email?.let {
+                // If DB fetch fails, at least surface the auth email
+                AuthRepository.currentUser()?.email?.let {
                     _currentUserData.value = _currentUserData.value.copy(email = it)
                 }
             }
@@ -77,27 +61,17 @@ class AccountSettingsViewModel : ViewModel() {
         viewModelScope.launch {
             _updateStatus.value = UpdateState.Loading
             try {
-                val userId = client.auth.currentUserOrNull()?.id ?: throw Exception("Not logged in")
-                
-                client.postgrest["users"].update(
-                    {
-                        set("name", name)
-                        set("display_name", displayName)
-                        set("phone", phone)
-                    }
-                ) {
-                    filter { eq("user_id", userId) }
-                }
+                val userId = AuthRepository.currentUser()?.id ?: throw Exception("Not logged in")
 
-                client.auth.updateUser {
-                    data = buildJsonObject {
-                        put("full_name", name)
-                        put("display_name", displayName)
-                    }
-                }
+                UserRepository.updateProfile(userId, name, displayName, phone)
+
+                AuthRepository.updateUser(buildJsonObject {
+                    put("full_name", name)
+                    put("display_name", displayName)
+                })
 
                 _updateStatus.value = UpdateState.Success("Profile updated successfully")
-                loadCurrentUserData() // Refresh data
+                loadCurrentUserData()
             } catch (e: Exception) {
                 _updateStatus.value = UpdateState.Error(e.localizedMessage ?: "Update failed")
             }
@@ -108,24 +82,14 @@ class AccountSettingsViewModel : ViewModel() {
         viewModelScope.launch {
             _updateStatus.value = UpdateState.Loading
             try {
-                val userId = client.auth.currentUserOrNull()?.id ?: throw Exception("Not logged in")
+                val userId = AuthRepository.currentUser()?.id ?: throw Exception("Not logged in")
 
-                // 1. Update Authentication Table
-                client.auth.updateUser {
-                    email = newEmail
-                }
+                AuthRepository.updateEmail(newEmail)
+                UserRepository.updateEmail(userId, newEmail)
 
-                // 2. Update Public Users Table
-                client.postgrest["users"].update(
-                    {
-                        set("email", newEmail)
-                    }
-                ) {
-                    filter { eq("user_id", userId) }
-                }
-
-                _updateStatus.value = UpdateState.Success("Email update started. Check your new email for confirmation.")
-                loadCurrentUserData() // Refresh data
+                _updateStatus.value =
+                    UpdateState.Success("Email update started. Check your new email for confirmation.")
+                loadCurrentUserData()
             } catch (e: Exception) {
                 _updateStatus.value = UpdateState.Error(e.localizedMessage ?: "Email update failed")
             }
@@ -136,14 +100,12 @@ class AccountSettingsViewModel : ViewModel() {
         viewModelScope.launch {
             _passwordVerificationStatus.value = PasswordVerificationStatus.Loading
             try {
-                val email = client.auth.currentUserOrNull()?.email ?: throw Exception("Not logged in")
-                client.auth.signInWith(Email) {
-                    this.email = email
-                    this.password = password
-                }
+                val email = AuthRepository.currentUser()?.email ?: throw Exception("Not logged in")
+                AuthRepository.verifyPassword(email, password)
                 _passwordVerificationStatus.value = PasswordVerificationStatus.Success
             } catch (e: Exception) {
-                _passwordVerificationStatus.value = PasswordVerificationStatus.Error("Incorrect current password")
+                _passwordVerificationStatus.value =
+                    PasswordVerificationStatus.Error("Incorrect current password")
             }
         }
     }
@@ -152,9 +114,7 @@ class AccountSettingsViewModel : ViewModel() {
         viewModelScope.launch {
             _updateStatus.value = UpdateState.Loading
             try {
-                client.auth.updateUser {
-                    password = newPassword
-                }
+                AuthRepository.updatePassword(newPassword)
                 _updateStatus.value = UpdateState.Success("Password updated successfully")
                 resetPasswordVerification()
             } catch (e: Exception) {
@@ -169,7 +129,7 @@ class AccountSettingsViewModel : ViewModel() {
 
     fun signOut() {
         viewModelScope.launch {
-            client.auth.signOut()
+            AuthRepository.signOut()
         }
     }
 
