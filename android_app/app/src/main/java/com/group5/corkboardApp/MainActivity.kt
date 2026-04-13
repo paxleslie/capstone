@@ -25,7 +25,6 @@ import com.group5.corkboardApp.ui.auth.LoginScreen
 import com.group5.corkboardApp.ui.auth.SignupScreen
 import com.group5.corkboardApp.ui.board.BoardScreen
 import com.group5.corkboardApp.ui.userProfile.UserProfileScreen
-import com.group5.corkboardApp.ui.household.HouseholdScreen
 import com.group5.corkboardApp.ui.message.MessageScreen
 import com.group5.corkboardApp.ui.theme.MyApplicationTheme
 import com.group5.corkboardApp.util.Constants
@@ -38,7 +37,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            _root_ide_package_.com.group5.corkboardApp.ui.theme.MyApplicationTheme {
+            MyApplicationTheme {
                 AuthGate()
             }
         }
@@ -101,14 +100,20 @@ fun MyApplicationApp() {
             when (currentDestination) {
                 Constants.AppDestinations.BOARD -> BoardScreen(modifier = Modifier.padding(innerPadding))
                 Constants.AppDestinations.MESSAGE -> MessageScreen(modifier = Modifier.padding(innerPadding))
-                Constants.AppDestinations.HOUSEHOLD -> HouseholdScreen(modifier = Modifier.padding(innerPadding))
+                Constants.AppDestinations.SHOP -> ShopScreen(modifier = Modifier.padding(innerPadding))
                 Constants.AppDestinations.PROFILE -> UserProfileScreen(modifier = Modifier.padding(innerPadding))
             }
         }
     }
 }
 
-// this should go into UserProfileScreen
+@Composable
+fun ShopScreen(modifier: Modifier = Modifier) {
+    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Text(text = "Page for Shop")
+    }
+}
+
 @Composable
 fun Greeting(name: String, modifier: Modifier = Modifier) {
     Text(
@@ -116,6 +121,7 @@ fun Greeting(name: String, modifier: Modifier = Modifier) {
         modifier = modifier
     )
 }
+
 @Preview(showBackground = true)
 @Composable
 fun GreetingPreview() {
@@ -123,5 +129,3 @@ fun GreetingPreview() {
         Greeting("Android")
     }
 }
-
-
