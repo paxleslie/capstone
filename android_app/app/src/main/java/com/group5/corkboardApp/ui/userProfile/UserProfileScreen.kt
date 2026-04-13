@@ -1,5 +1,6 @@
 package com.group5.corkboardApp.ui.userProfile
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,8 +32,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.group5.corkboardApp.ui.household.HouseholdViewModel
@@ -59,6 +62,9 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
     val addMemberState by householdViewModel.addMemberState.collectAsState()
     var emailToAdd by remember { mutableStateOf("")}
     
+    var showRenameDialog by remember { mutableStateOf(false) }
+    var renamedHouseholdName by remember { mutableStateOf("") }
+    
     val focusManager = LocalFocusManager.current
 
     LaunchedEffect(Unit) {
@@ -84,6 +90,13 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
         if (addMemberState is HouseholdViewModel.MemberAddState.Success) {
             emailToAdd = ""
             householdViewModel.resetAddMemberState()
+        }
+    }
+    
+    LaunchedEffect(actionState) {
+        if (actionState is HouseholdViewModel.HouseholdActionState.Success && showRenameDialog) {
+            showRenameDialog = false
+            renamedHouseholdName = ""
         }
     }
 
@@ -188,7 +201,16 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                             val currentUserId = currentMemberState?.user_id
 
                             Column(modifier = Modifier.fillMaxSize()) {
-                                Text(text = dState.household.household_name, style = MaterialTheme.typography.headlineMedium)
+                                Text(
+                                    text = dState.household.household_name, 
+                                    style = MaterialTheme.typography.headlineMedium,
+                                    textDecoration = if (isAdmin) TextDecoration.Underline else TextDecoration.None,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = if (isAdmin) Modifier.clickable {
+                                        renamedHouseholdName = dState.household.household_name
+                                        showRenameDialog = true
+                                    } else Modifier
+                                )
                                 Text(text = "Your Role: ${currentMemberState?.role}", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
                                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -206,7 +228,7 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                                     Spacer(modifier = Modifier.height(16.dp))
                                     OutlinedTextField(
                                         value = emailToAdd,
-                                        onValueChange = { emailToAdd = it },
+                                        onValueChange = { if (it.length <= 50) emailToAdd = it },
                                         label = { Text("Add member by email") },
                                         modifier = Modifier.fillMaxWidth(),
                                         enabled = addMemberState !is HouseholdViewModel.MemberAddState.Loading,
@@ -326,7 +348,7 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                 Column {
                     OutlinedTextField(
                         value = newHouseholdName,
-                        onValueChange = { newHouseholdName = it },
+                        onValueChange = { if (it.length <= 50) newHouseholdName = it },
                         label = { Text("Household Name") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
@@ -374,6 +396,67 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                         householdViewModel.resetCreateState()
                     },
                     enabled = createState !is HouseholdViewModel.HouseholdCreateState.Loading
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+    
+    if (showRenameDialog) {
+        val dState = householdDetailState as? HouseholdViewModel.HouseholdDetailState.Success
+        AlertDialog(
+            onDismissRequest = {
+                if (actionState !is HouseholdViewModel.HouseholdActionState.Loading) {
+                    showRenameDialog = false
+                }
+            },
+            title = { Text("Rename Household") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = renamedHouseholdName,
+                        onValueChange = { if (it.length <= 50) renamedHouseholdName = it },
+                        label = { Text("New Household Name") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = actionState !is HouseholdViewModel.HouseholdActionState.Loading,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                if (renamedHouseholdName.isNotBlank() && dState != null) {
+                                    focusManager.clearFocus()
+                                    householdViewModel.updateHouseholdName(dState.household, renamedHouseholdName.trim())
+                                }
+                            }
+                        )
+                    )
+                    if (actionState is HouseholdViewModel.HouseholdActionState.Error) {
+                        Text(text = (actionState as HouseholdViewModel.HouseholdActionState.Error).message, color = Color.Red)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (renamedHouseholdName.isNotBlank() && dState != null) {
+                            focusManager.clearFocus()
+                            householdViewModel.updateHouseholdName(dState.household, renamedHouseholdName.trim())
+                        }
+                    },
+                    enabled = actionState !is HouseholdViewModel.HouseholdActionState.Loading && renamedHouseholdName.isNotBlank()
+                ) {
+                    if (actionState is HouseholdViewModel.HouseholdActionState.Loading) {
+                        CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
+                    } else {
+                        Text("Update")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showRenameDialog = false },
+                    enabled = actionState !is HouseholdViewModel.HouseholdActionState.Loading
                 ) {
                     Text("Cancel")
                 }

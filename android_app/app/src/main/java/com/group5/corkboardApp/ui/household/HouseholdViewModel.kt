@@ -1,6 +1,7 @@
+@file:Suppress("PropertyName")
+
 package com.group5.corkboardApp.ui.household
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.group5.corkboardApp.util.SupabaseClient
@@ -86,9 +87,7 @@ class HouseholdViewModel : ViewModel() {
         data class Success(
             val household: Household,
             val members: List<HouseholdMember> = emptyList()
-        ) : HouseholdDetailState() {
-            val isEmpty get() = members.isEmpty()
-        }
+        ) : HouseholdDetailState()
         data class Error(val message: String) : HouseholdDetailState()
     }
 
@@ -112,7 +111,6 @@ class HouseholdViewModel : ViewModel() {
         data class Error(val message: String) : HouseholdActionState()
     }
 
-    private val TAG = "HouseholdViewModel"
     private val client = SupabaseClient.client
 
     private val _householdListState = MutableStateFlow<HouseholdListState>(HouseholdListState.Loading)
@@ -160,6 +158,32 @@ class HouseholdViewModel : ViewModel() {
         }
     }
 
+    fun updateHouseholdName(household: Household, newName: String) {
+        viewModelScope.launch {
+            _actionState.value = HouseholdActionState.Loading
+            try {
+                client.postgrest["households"].update(
+                    {
+                        set("household_name", newName)
+                    }
+                ) {
+                    filter {
+                        eq("household_id", household.household_id)
+                    }
+                }
+                
+                _actionState.value = HouseholdActionState.Success("Household name updated")
+                
+                // Refresh detail state
+                val members = fetchMembersData(household.household_id)
+                _detailState.value = HouseholdDetailState.Success(household.copy(household_name = newName), members)
+                fetchHouseholds()
+            } catch (e: Exception) {
+                _actionState.value = HouseholdActionState.Error(e.localizedMessage ?: "Failed to update household name")
+            }
+        }
+    }
+
     fun fetchHouseholds() {
         viewModelScope.launch {
             _householdListState.value = HouseholdListState.Loading
@@ -188,7 +212,7 @@ class HouseholdViewModel : ViewModel() {
             try {
                 val household = client.postgrest["households"].select { filter { eq("household_id", householdId) } }.decodeList<Household>().firstOrNull()
                 if (household != null) {
-                    val members = data_getMembers(householdId)
+                    val members = fetchMembersData(householdId)
                     _detailState.value = HouseholdDetailState.Success(household, members)
                     _navState.value = NavState.Detail
                 } else {
@@ -200,12 +224,12 @@ class HouseholdViewModel : ViewModel() {
         }
     }
 
-    private suspend fun data_getMembers(householdId: String): List<HouseholdMember> {
+    private suspend fun fetchMembersData(householdId: String): List<HouseholdMember> {
         return try {
             client.postgrest["household_members"]
                 .select(Columns.raw("*, users(display_name, name, email)")) { filter { eq("household_id", householdId) } }
                 .decodeList<HouseholdMember>()
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             client.postgrest["household_members"].select { filter { eq("household_id", householdId) } }.decodeList<HouseholdMember>()
         }
     }
@@ -221,7 +245,7 @@ class HouseholdViewModel : ViewModel() {
                 client.postgrest.rpc("add_user_to_household_by_email", params)
                 _addMemberState.value = MemberAddState.Success
                 
-                val members = data_getMembers(household.household_id)
+                val members = fetchMembersData(household.household_id)
                 _detailState.value = HouseholdDetailState.Success(household, members)
                 
             } catch (e: Exception) {
@@ -234,8 +258,6 @@ class HouseholdViewModel : ViewModel() {
         viewModelScope.launch {
             _actionState.value = HouseholdActionState.Loading
             try {
-                // Using lowercase parameter names exactly as suggested by the Supabase error hint
-                // The DB logic uses member_id = userID, so we pass the memberId
                 val params = buildJsonObject {
                     put("householdid", household.household_id)
                     put("userid", memberId)
@@ -244,7 +266,7 @@ class HouseholdViewModel : ViewModel() {
                 client.postgrest.rpc("remove_household_member", params)
                 _actionState.value = HouseholdActionState.Success("Member removed")
                 
-                val members = data_getMembers(household.household_id)
+                val members = fetchMembersData(household.household_id)
                 _detailState.value = HouseholdDetailState.Success(household, members)
                 fetchHouseholds()
             } catch (e: Exception) {

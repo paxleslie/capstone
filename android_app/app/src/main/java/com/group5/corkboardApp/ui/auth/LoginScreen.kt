@@ -74,7 +74,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToSignup: () -> Unit) {
         
         OutlinedTextField(
             value = email,
-            onValueChange = { email = it },
+            onValueChange = { if (it.length <= 50) email = it },
             label = { Text("Email") },
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Email,
@@ -88,7 +88,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToSignup: () -> Unit) {
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
             value = password,
-            onValueChange = { password = it },
+            onValueChange = { if (it.length <= 50) password = it },
             label = { Text("Password") },
             visualTransformation = PasswordVisualTransformation(),
             keyboardOptions = KeyboardOptions(
