@@ -281,7 +281,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                                 DropdownMenuItem(
                                     text = { Text(household.household_name) },
                                     onClick = {
-                                        selectedHouseholdId = household.household_id
+                                        viewModel.selectHousehold(household.household_id)
                                         householdDropdownExpanded = false
                                     }
                                 )
