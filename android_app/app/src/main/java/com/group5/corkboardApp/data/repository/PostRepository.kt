@@ -10,4 +10,11 @@ object PostRepository {
     suspend fun createPost(post: Post) {
         client.postgrest["posts"].insert(post)
     }
+
+    suspend fun getPostsForHouseholds(householdIds: List<String>): List<Post> {
+        if (householdIds.isEmpty()) return emptyList()
+        return client.postgrest["posts"]
+            .select { filter { isIn("household_id", householdIds) } }
+            .decodeList<Post>()
+    }
 }

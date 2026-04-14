@@ -26,11 +26,20 @@ class BoardViewModel : ViewModel() {
         data class Error(val message: String) : CreatePostState()
     }
 
+    sealed class PostsLoadState {
+        data object Loading : PostsLoadState()
+        data class Success(val posts: List<Post>) : PostsLoadState()
+        data class Error(val message: String) : PostsLoadState()
+    }
+
     private val _householdLoadState = MutableStateFlow<HouseholdLoadState>(HouseholdLoadState.Loading)
     val householdLoadState: StateFlow<HouseholdLoadState> = _householdLoadState
 
     private val _createPostState = MutableStateFlow<CreatePostState>(CreatePostState.Idle)
     val createPostState: StateFlow<CreatePostState> = _createPostState
+
+    private val _postsLoadState = MutableStateFlow<PostsLoadState>(PostsLoadState.Loading)
+    val postsLoadState: StateFlow<PostsLoadState> = _postsLoadState
 
     init {
         loadHouseholds()
@@ -47,9 +56,24 @@ class BoardViewModel : ViewModel() {
                 val households = if (householdIds.isEmpty()) emptyList()
                 else HouseholdRepository.getUserHouseholds(userId)
                 _householdLoadState.value = HouseholdLoadState.Success(households)
+                loadPosts(householdIds)
             } catch (e: Exception) {
                 _householdLoadState.value = HouseholdLoadState.Error(
                     e.localizedMessage ?: "Failed to load households"
+                )
+            }
+        }
+    }
+
+    private fun loadPosts(householdIds: List<String>) {
+        viewModelScope.launch {
+            _postsLoadState.value = PostsLoadState.Loading
+            try {
+                val posts = PostRepository.getPostsForHouseholds(householdIds)
+                _postsLoadState.value = PostsLoadState.Success(posts)
+            } catch (e: Exception) {
+                _postsLoadState.value = PostsLoadState.Error(
+                    e.localizedMessage ?: "Failed to load posts"
                 )
             }
         }
@@ -85,6 +109,10 @@ class BoardViewModel : ViewModel() {
                     )
                 )
                 _createPostState.value = CreatePostState.Success
+                // Refresh post list after successful creation
+                val currentHouseholds = (_householdLoadState.value as? HouseholdLoadState.Success)
+                    ?.households?.map { it.household_id } ?: emptyList()
+                loadPosts(currentHouseholds)
             } catch (e: Exception) {
                 _createPostState.value = CreatePostState.Error(
                     e.localizedMessage ?: "Failed to create post"
