@@ -61,6 +61,8 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     val postsLoadState by viewModel.postsLoadState.collectAsState()
     val postActionState by viewModel.postActionState.collectAsState()
 
+    LaunchedEffect(Unit) { viewModel.loadHouseholds() }
+
     var showCreateDialog by remember { mutableStateOf(false) }
     var postToEdit by remember { mutableStateOf<Post?>(null) }
     var postToDelete by remember { mutableStateOf<Post?>(null) }
