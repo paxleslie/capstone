@@ -48,6 +48,13 @@ class BoardViewModel : ViewModel() {
     private val _postsLoadState = MutableStateFlow<PostsLoadState>(PostsLoadState.Loading)
     val postsLoadState: StateFlow<PostsLoadState> = _postsLoadState
 
+    private val _selectedHouseholdId = MutableStateFlow<String?>(null)
+    val selectedHouseholdId: StateFlow<String?> = _selectedHouseholdId
+
+    fun selectHousehold(householdId: String) {
+        _selectedHouseholdId.value = householdId
+    }
+
     private val _postActionState = MutableStateFlow<PostActionState>(PostActionState.Idle)
     val postActionState: StateFlow<PostActionState> = _postActionState
 
@@ -68,6 +75,9 @@ class BoardViewModel : ViewModel() {
                 val households = if (householdIds.isEmpty()) emptyList()
                 else HouseholdRepository.getUserHouseholds(userId)
                 _householdLoadState.value = HouseholdLoadState.Success(households)
+                if (_selectedHouseholdId.value == null) {
+                    _selectedHouseholdId.value = households.firstOrNull()?.household_id
+                }
                 loadPosts(householdIds)
             } catch (e: Exception) {
                 _householdLoadState.value = HouseholdLoadState.Error(

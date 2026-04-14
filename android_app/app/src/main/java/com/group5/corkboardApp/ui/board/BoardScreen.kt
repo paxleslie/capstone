@@ -60,6 +60,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     val createPostState by viewModel.createPostState.collectAsState()
     val postsLoadState by viewModel.postsLoadState.collectAsState()
     val postActionState by viewModel.postActionState.collectAsState()
+    val selectedHouseholdId by viewModel.selectedHouseholdId.collectAsState()
 
     LaunchedEffect(Unit) { viewModel.loadHouseholds() }
 
@@ -71,20 +72,11 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     var selectedType by remember { mutableStateOf("note") }
     var pointValue by remember { mutableStateOf("") }
     var dueAt by remember { mutableStateOf("") }
-    var selectedHouseholdId by remember { mutableStateOf<String?>(null) }
     var householdDropdownExpanded by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
 
     val households = (householdLoadState as? BoardViewModel.HouseholdLoadState.Success)?.households ?: emptyList()
-    val effectiveHouseholdId = selectedHouseholdId ?: households.firstOrNull()?.household_id
-    val selectedHousehold = households.find { it.household_id == effectiveHouseholdId }
-
-    // Persist the default selection once loaded so chip shows as selected
-    LaunchedEffect(householdLoadState) {
-        if (householdLoadState is BoardViewModel.HouseholdLoadState.Success && selectedHouseholdId == null) {
-            selectedHouseholdId = households.firstOrNull()?.household_id
-        }
-    }
+    val selectedHousehold = households.find { it.household_id == selectedHouseholdId }
 
     LaunchedEffect(createPostState) {
         when (val state = createPostState) {
@@ -139,8 +131,8 @@ fun BoardScreen(modifier: Modifier = Modifier) {
             ) {
                 items(households, key = { it.household_id }) { household ->
                     FilterChip(
-                        selected = household.household_id == effectiveHouseholdId,
-                        onClick = { selectedHouseholdId = household.household_id },
+                        selected = household.household_id == selectedHouseholdId,
+                        onClick = { viewModel.selectHousehold(household.household_id) },
                         label = { Text(household.household_name) }
                     )
                 }
@@ -162,8 +154,8 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                     )
                 }
                 is BoardViewModel.PostsLoadState.Success -> {
-                    val visiblePosts = if (effectiveHouseholdId != null)
-                        state.posts.filter { it.household_id == effectiveHouseholdId }
+                    val visiblePosts = if (selectedHouseholdId != null)
+                        state.posts.filter { it.household_id == selectedHouseholdId }
                     else
                         state.posts
 
