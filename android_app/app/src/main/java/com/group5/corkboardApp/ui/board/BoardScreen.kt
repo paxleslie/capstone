@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -107,50 +108,74 @@ fun BoardScreen(modifier: Modifier = Modifier) {
 
     val isLoading = createPostState is BoardViewModel.CreatePostState.Loading
 
-    Box(modifier = modifier.fillMaxSize()) {
-        when (val state = postsLoadState) {
-            is BoardViewModel.PostsLoadState.Loading -> {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
-            }
-            is BoardViewModel.PostsLoadState.Error -> {
-                Text(
-                    text = state.message,
-                    color = Color.Red,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(16.dp)
+    Column(modifier = modifier.fillMaxSize()) {
+        if (households.isNotEmpty()) {
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                    horizontal = 16.dp, vertical = 8.dp
                 )
-            }
-            is BoardViewModel.PostsLoadState.Success -> {
-                if (state.posts.isEmpty()) {
-                    Text(
-                        text = "No posts yet",
-                        modifier = Modifier.align(Alignment.Center),
-                        style = MaterialTheme.typography.bodyLarge
+            ) {
+                items(households, key = { it.household_id }) { household ->
+                    FilterChip(
+                        selected = household.household_id == selectedHouseholdId,
+                        onClick = { selectedHouseholdId = household.household_id },
+                        label = { Text(household.household_name) }
                     )
-                } else {
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                            start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp
-                        ),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(state.posts, key = { it.post_id ?: it.hashCode() }) { post ->
-                            PostCard(post = post)
-                        }
-                    }
                 }
             }
         }
 
-        FloatingActionButton(
-            onClick = { showCreateDialog = true },
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(16.dp)
-        ) {
-            Icon(Icons.Default.Add, contentDescription = "Create post")
+        Box(modifier = Modifier.weight(1f)) {
+            when (val state = postsLoadState) {
+                is BoardViewModel.PostsLoadState.Loading -> {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                }
+                is BoardViewModel.PostsLoadState.Error -> {
+                    Text(
+                        text = state.message,
+                        color = Color.Red,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(16.dp)
+                    )
+                }
+                is BoardViewModel.PostsLoadState.Success -> {
+                    val visiblePosts = if (selectedHouseholdId != null)
+                        state.posts.filter { it.household_id == selectedHouseholdId }
+                    else
+                        state.posts
+
+                    if (visiblePosts.isEmpty()) {
+                        Text(
+                            text = "No posts yet",
+                            modifier = Modifier.align(Alignment.Center),
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                    } else {
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(visiblePosts, key = { it.post_id ?: it.hashCode() }) { post ->
+                                PostCard(post = post)
+                            }
+                        }
+                    }
+                }
+            }
+
+            FloatingActionButton(
+                onClick = { showCreateDialog = true },
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(16.dp)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = "Create post")
+            }
         }
     }
 
