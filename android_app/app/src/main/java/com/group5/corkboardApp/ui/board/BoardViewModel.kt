@@ -57,7 +57,9 @@ class BoardViewModel : ViewModel() {
 
     fun loadHouseholds() {
         viewModelScope.launch {
-            _householdLoadState.value = HouseholdLoadState.Loading
+            if (_householdLoadState.value !is HouseholdLoadState.Success) {
+                _householdLoadState.value = HouseholdLoadState.Loading
+            }
             try {
                 val userId = AuthRepository.currentUser()?.id
                     ?: throw Exception("User not authenticated")
@@ -77,7 +79,9 @@ class BoardViewModel : ViewModel() {
 
     private fun loadPosts(householdIds: List<String>) {
         viewModelScope.launch {
-            _postsLoadState.value = PostsLoadState.Loading
+            if (_postsLoadState.value !is PostsLoadState.Success) {
+                _postsLoadState.value = PostsLoadState.Loading
+            }
             try {
                 val posts = PostRepository.getPostsForHouseholds(householdIds)
                 _postsLoadState.value = PostsLoadState.Success(posts)
