@@ -76,9 +76,10 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     var errorText by remember { mutableStateOf<String?>(null) }
 
     val households = (householdLoadState as? BoardViewModel.HouseholdLoadState.Success)?.households ?: emptyList()
-    val selectedHousehold = households.find { it.household_id == selectedHouseholdId }
+    val effectiveHouseholdId = selectedHouseholdId ?: households.firstOrNull()?.household_id
+    val selectedHousehold = households.find { it.household_id == effectiveHouseholdId }
 
-    // Pre-select first household once loaded
+    // Persist the default selection once loaded so chip shows as selected
     LaunchedEffect(householdLoadState) {
         if (householdLoadState is BoardViewModel.HouseholdLoadState.Success && selectedHouseholdId == null) {
             selectedHouseholdId = households.firstOrNull()?.household_id
@@ -138,7 +139,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
             ) {
                 items(households, key = { it.household_id }) { household ->
                     FilterChip(
-                        selected = household.household_id == selectedHouseholdId,
+                        selected = household.household_id == effectiveHouseholdId,
                         onClick = { selectedHouseholdId = household.household_id },
                         label = { Text(household.household_name) }
                     )
@@ -161,8 +162,8 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                     )
                 }
                 is BoardViewModel.PostsLoadState.Success -> {
-                    val visiblePosts = if (selectedHouseholdId != null)
-                        state.posts.filter { it.household_id == selectedHouseholdId }
+                    val visiblePosts = if (effectiveHouseholdId != null)
+                        state.posts.filter { it.household_id == effectiveHouseholdId }
                     else
                         state.posts
 
