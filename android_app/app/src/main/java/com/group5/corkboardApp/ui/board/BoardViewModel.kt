@@ -32,6 +32,13 @@ class BoardViewModel : ViewModel() {
         data class Error(val message: String) : PostsLoadState()
     }
 
+    sealed class PostActionState {
+        data object Idle : PostActionState()
+        data object Loading : PostActionState()
+        data object Success : PostActionState()
+        data class Error(val message: String) : PostActionState()
+    }
+
     private val _householdLoadState = MutableStateFlow<HouseholdLoadState>(HouseholdLoadState.Loading)
     val householdLoadState: StateFlow<HouseholdLoadState> = _householdLoadState
 
@@ -40,6 +47,9 @@ class BoardViewModel : ViewModel() {
 
     private val _postsLoadState = MutableStateFlow<PostsLoadState>(PostsLoadState.Loading)
     val postsLoadState: StateFlow<PostsLoadState> = _postsLoadState
+
+    private val _postActionState = MutableStateFlow<PostActionState>(PostActionState.Idle)
+    val postActionState: StateFlow<PostActionState> = _postActionState
 
     init {
         loadHouseholds()
@@ -123,5 +133,77 @@ class BoardViewModel : ViewModel() {
 
     fun resetCreateState() {
         _createPostState.value = CreatePostState.Idle
+    }
+
+    fun updatePost(
+        post: Post,
+        title: String,
+        body: String,
+        pointValue: Int? = null,
+        dueAt: String? = null
+    ) {
+        viewModelScope.launch {
+            _postActionState.value = PostActionState.Loading
+            try {
+                PostRepository.updatePost(
+                    postId = post.post_id!!,
+                    title = title.ifBlank { null },
+                    body = body.ifBlank { null },
+                    pointValue = pointValue,
+                    dueAt = dueAt?.ifBlank { null }
+                )
+                _postActionState.value = PostActionState.Success
+                refreshPosts()
+            } catch (e: Exception) {
+                _postActionState.value = PostActionState.Error(
+                    e.localizedMessage ?: "Failed to update post"
+                )
+            }
+        }
+    }
+
+    fun deletePost(postId: String) {
+        viewModelScope.launch {
+            _postActionState.value = PostActionState.Loading
+            try {
+                PostRepository.deletePost(postId)
+                _postActionState.value = PostActionState.Success
+                refreshPosts()
+            } catch (e: Exception) {
+                _postActionState.value = PostActionState.Error(
+                    e.localizedMessage ?: "Failed to delete post"
+                )
+            }
+        }
+    }
+
+    fun completeChore(post: Post) {
+        viewModelScope.launch {
+            _postActionState.value = PostActionState.Loading
+            try {
+                val userId = AuthRepository.currentUser()?.id
+                    ?: throw Exception("User not authenticated")
+                val memberships = HouseholdRepository.getUserMemberships(userId)
+                val memberId = memberships.find { it.household_id == post.household_id }?.member_id
+                    ?: throw Exception("Not a member of this household")
+                PostRepository.completeChore(post.post_id!!, memberId)
+                _postActionState.value = PostActionState.Success
+                refreshPosts()
+            } catch (e: Exception) {
+                _postActionState.value = PostActionState.Error(
+                    e.localizedMessage ?: "Failed to complete chore"
+                )
+            }
+        }
+    }
+
+    fun resetActionState() {
+        _postActionState.value = PostActionState.Idle
+    }
+
+    private fun refreshPosts() {
+        val householdIds = (_householdLoadState.value as? HouseholdLoadState.Success)
+            ?.households?.map { it.household_id } ?: emptyList()
+        loadPosts(householdIds)
     }
 }

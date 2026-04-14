@@ -3,6 +3,8 @@ package com.group5.corkboardApp.data.repository
 import com.group5.corkboardApp.data.model.Post
 import com.group5.corkboardApp.util.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 object PostRepository {
     private val client = SupabaseClient.client
@@ -17,4 +19,27 @@ object PostRepository {
             .select { filter { isIn("household_id", householdIds) } }
             .decodeList<Post>()
     }
+
+    suspend fun updatePost(postId: String, title: String?, body: String?, pointValue: Int?, dueAt: String?) {
+        client.postgrest["posts"].update({
+            set("title", title)
+            set("body", body)
+            set("point_value", pointValue)
+            set("due_at", dueAt)
+        }) { filter { eq("post_id", postId) } }
+    }
+
+    suspend fun deletePost(postId: String) {
+        client.postgrest["posts"].delete { filter { eq("post_id", postId) } }
+    }
+
+    suspend fun completeChore(postId: String, memberId: String) {
+        client.postgrest.rpc("complete_chore", CompleteChoreParams(postId, memberId))
+    }
 }
+
+@Serializable
+private data class CompleteChoreParams(
+    @SerialName("p_post_id") val postId: String,
+    @SerialName("p_member_id") val memberId: String
+)
