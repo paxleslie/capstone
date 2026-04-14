@@ -38,3 +38,18 @@ data class UserProfile(
     val display_name: String = "",
     val phone: String = ""
 )
+
+@Serializable
+data class Post(
+    val post_id: String? = null,
+    val author_id: String? = null,
+    val member_id: String? = null,
+    val type: String,
+    val title: String? = null,
+    val body: String? = null,
+    val point_value: Int? = null,
+    val status: String? = null,
+    val created_at: String? = null,
+    val due_at: String? = null,
+    val household_id: String
+)
