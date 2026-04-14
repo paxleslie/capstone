@@ -3,8 +3,8 @@ package com.group5.corkboardApp.data.repository
 import com.group5.corkboardApp.data.model.Post
 import com.group5.corkboardApp.util.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 object PostRepository {
     private val client = SupabaseClient.client
@@ -34,12 +34,9 @@ object PostRepository {
     }
 
     suspend fun completeChore(postId: String, memberId: String) {
-        client.postgrest.rpc("complete_chore", CompleteChoreParams(postId, memberId))
+        client.postgrest.rpc("complete_chore", buildJsonObject {
+            put("p_post_id", postId)
+            put("p_member_id", memberId)
+        })
     }
 }
-
-@Serializable
-private data class CompleteChoreParams(
-    @SerialName("p_post_id") val postId: String,
-    @SerialName("p_member_id") val memberId: String
-)

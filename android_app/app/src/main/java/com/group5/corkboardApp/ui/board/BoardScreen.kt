@@ -15,6 +15,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -55,8 +59,11 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     val householdLoadState by viewModel.householdLoadState.collectAsState()
     val createPostState by viewModel.createPostState.collectAsState()
     val postsLoadState by viewModel.postsLoadState.collectAsState()
+    val postActionState by viewModel.postActionState.collectAsState()
 
     var showCreateDialog by remember { mutableStateOf(false) }
+    var postToEdit by remember { mutableStateOf<Post?>(null) }
+    var postToDelete by remember { mutableStateOf<Post?>(null) }
     var title by remember { mutableStateOf("") }
     var body by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf("note") }
@@ -90,6 +97,17 @@ fun BoardScreen(modifier: Modifier = Modifier) {
             }
             is BoardViewModel.CreatePostState.Error -> {
                 errorText = state.message
+            }
+            else -> {}
+        }
+    }
+
+    LaunchedEffect(postActionState) {
+        when (postActionState) {
+            is BoardViewModel.PostActionState.Success -> {
+                postToEdit = null
+                postToDelete = null
+                viewModel.resetActionState()
             }
             else -> {}
         }
@@ -161,7 +179,12 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             items(visiblePosts, key = { it.post_id ?: it.hashCode() }) { post ->
-                                PostCard(post = post)
+                                PostCard(
+                                    post = post,
+                                    onEdit = { postToEdit = post },
+                                    onDelete = { postToDelete = post },
+                                    onComplete = { viewModel.completeChore(post) }
+                                )
                             }
                         }
                     }
@@ -310,10 +333,124 @@ fun BoardScreen(modifier: Modifier = Modifier) {
             }
         )
     }
+
+    // Edit dialog
+    postToEdit?.let { post ->
+        val actionLoading = postActionState is BoardViewModel.PostActionState.Loading
+        var editTitle by remember(post.post_id) { mutableStateOf(post.title ?: "") }
+        var editBody by remember(post.post_id) { mutableStateOf(post.body ?: "") }
+        var editPointValue by remember(post.post_id) { mutableStateOf(post.point_value?.toString() ?: "") }
+        var editDueAt by remember(post.post_id) { mutableStateOf(post.due_at ?: "") }
+        var editError by remember(post.post_id) { mutableStateOf<String?>(null) }
+
+        AlertDialog(
+            onDismissRequest = { if (!actionLoading) { postToEdit = null; viewModel.resetActionState() } },
+            title = { Text("Edit Post") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = editTitle,
+                        onValueChange = { editTitle = it },
+                        label = { Text("Title") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !actionLoading
+                    )
+                    OutlinedTextField(
+                        value = editBody,
+                        onValueChange = { editBody = it },
+                        label = { Text("Body") },
+                        minLines = 3,
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !actionLoading
+                    )
+                    if (post.type == "chore") {
+                        OutlinedTextField(
+                            value = editPointValue,
+                            onValueChange = { editPointValue = it },
+                            label = { Text("Point Value") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !actionLoading
+                        )
+                        OutlinedTextField(
+                            value = editDueAt,
+                            onValueChange = { editDueAt = it },
+                            label = { Text("Due Date (YYYY-MM-DD)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            enabled = !actionLoading
+                        )
+                    }
+                    editError?.let { Text(text = it, color = Color.Red) }
+                    (postActionState as? BoardViewModel.PostActionState.Error)?.let {
+                        Text(text = it.message, color = Color.Red)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (editTitle.isBlank()) {
+                            editError = "Title cannot be empty"
+                        } else {
+                            viewModel.updatePost(
+                                post = post,
+                                title = editTitle.trim(),
+                                body = editBody.trim(),
+                                pointValue = editPointValue.toIntOrNull(),
+                                dueAt = editDueAt.ifBlank { null }
+                            )
+                        }
+                    },
+                    enabled = !actionLoading
+                ) {
+                    if (actionLoading) CircularProgressIndicator() else Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { postToEdit = null; viewModel.resetActionState() },
+                    enabled = !actionLoading
+                ) { Text("Cancel") }
+            }
+        )
+    }
+
+    // Delete confirmation
+    postToDelete?.let { post ->
+        val actionLoading = postActionState is BoardViewModel.PostActionState.Loading
+        AlertDialog(
+            onDismissRequest = { if (!actionLoading) { postToDelete = null; viewModel.resetActionState() } },
+            title = { Text("Delete Post") },
+            text = { Text("Are you sure you want to delete \"${post.title ?: "this post"}\"?") },
+            confirmButton = {
+                Button(
+                    onClick = { viewModel.deletePost(post.post_id!!) },
+                    enabled = !actionLoading,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                ) {
+                    if (actionLoading) CircularProgressIndicator() else Text("Delete")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { postToDelete = null; viewModel.resetActionState() },
+                    enabled = !actionLoading
+                ) { Text("Cancel") }
+            }
+        )
+    }
 }
 
 @Composable
-private fun PostCard(post: Post) {
+private fun PostCard(
+    post: Post,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    onComplete: () -> Unit
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -321,6 +458,7 @@ private fun PostCard(post: Post) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 post.title?.let {
@@ -337,6 +475,12 @@ private fun PostCard(post: Post) {
                     color = if (post.type == "chore") MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.secondary
                 )
+                IconButton(onClick = onEdit) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.padding(4.dp))
+                }
+                IconButton(onClick = onDelete) {
+                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.padding(4.dp))
+                }
             }
             post.body?.let {
                 Spacer(modifier = Modifier.height(4.dp))
@@ -344,18 +488,29 @@ private fun PostCard(post: Post) {
             }
             if (post.type == "chore") {
                 Spacer(modifier = Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    post.status?.let {
-                        Text(
-                            text = it.replaceFirstChar { c -> c.uppercase() },
-                            style = MaterialTheme.typography.labelSmall
-                        )
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        post.status?.let {
+                            Text(
+                                text = it.replaceFirstChar { c -> c.uppercase() },
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                        post.point_value?.let {
+                            Text(text = "$it pts", style = MaterialTheme.typography.labelSmall)
+                        }
+                        post.due_at?.let {
+                            Text(text = "Due: $it", style = MaterialTheme.typography.labelSmall)
+                        }
                     }
-                    post.point_value?.let {
-                        Text(text = "$it pts", style = MaterialTheme.typography.labelSmall)
-                    }
-                    post.due_at?.let {
-                        Text(text = "Due: $it", style = MaterialTheme.typography.labelSmall)
+                    if (post.status == "pending") {
+                        TextButton(onClick = onComplete) {
+                            Text("Mark Complete")
+                        }
                     }
                 }
             }
