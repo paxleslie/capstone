@@ -24,7 +24,9 @@ data class HouseholdMember(
     val user_id: String,
     val household_id: String,
     val role: String,
-    val nickname: String,
+    val nickname: String? = null,
+    val total_points: Int? = null,
+    val weekly_points: Int? = null,
     // the actual table is called users
     @SerialName("users")
     val profile: Profile? = null
@@ -37,4 +39,19 @@ data class UserProfile(
     val email: String = "",
     val display_name: String = "",
     val phone: String = ""
+)
+
+@Serializable
+data class Post(
+    val post_id: String? = null,
+    val author_id: String? = null,
+    val member_id: String? = null,
+    val type: String,
+    val title: String? = null,
+    val body: String? = null,
+    val point_value: Int? = null,
+    val status: String? = null,
+    val created_at: String? = null,
+    val due_at: String? = null,
+    val household_id: String
 )

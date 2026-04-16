@@ -271,7 +271,10 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                                     ) { member ->
                                         Column(modifier = Modifier.padding(vertical = 8.dp)) {
                                             val profile = member.profile
-                                            val nameToShow = member.nickname ?: profile?.display_name ?: profile?.name ?: "User (${member.user_id.take(8)}...)"
+                                            val nameToShow = member.nickname?.takeIf { it.isNotBlank() }
+                                ?: profile?.display_name
+                                ?: profile?.name
+                                ?: "User (${member.user_id.take(8)}...)"
 
                                             Text(text = nameToShow, style = MaterialTheme.typography.bodyLarge)
                                             Text(text = "Role: ${member.role}", style = MaterialTheme.typography.bodySmall)
