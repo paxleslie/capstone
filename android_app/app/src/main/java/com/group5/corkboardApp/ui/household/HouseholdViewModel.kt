@@ -1,6 +1,7 @@
+@file:Suppress("PropertyName")
+
 package com.group5.corkboardApp.ui.household
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.group5.corkboardApp.data.model.Household
@@ -26,7 +27,6 @@ class HouseholdViewModel : ViewModel() {
     sealed class HouseholdListState {
         data object Idle : HouseholdListState()
         data object Loading : HouseholdListState()
-
         data class Success(
             val households: List<Household>,
             val isRefreshing: Boolean = false
@@ -43,7 +43,6 @@ class HouseholdViewModel : ViewModel() {
     sealed class HouseholdDetailState {
         data object Idle : HouseholdDetailState()
         data object Loading : HouseholdDetailState()
-
         data class Success(
             val household: Household,
             val members: List<HouseholdMember> = emptyList()
@@ -57,14 +56,8 @@ class HouseholdViewModel : ViewModel() {
     sealed class MemberAddState {
         data object Idle : MemberAddState()
         data object Loading : MemberAddState()
-
-        data object Success : MemberAddState() {
-            val message get() = "Member added successfully"
-        }
-
-        data class Error(val message: String) : MemberAddState() {
-            val errorMessage get() = "Failed to add member: $message"
-        }
+        data object Success : MemberAddState()
+        data class Error(val message: String) : MemberAddState()
     }
 
     sealed class NavState {
@@ -129,10 +122,35 @@ class HouseholdViewModel : ViewModel() {
 
                 Log.d(TAG, "Created household: $name")
                 _createState.value = HouseholdCreateState.Success
+                fetchHouseholds()
             } catch (e: Exception) {
-                _createState.value =
-                    HouseholdCreateState.Error(e.message ?: "Failed to create household")
-                Log.e(TAG, "Failed to create household: ${e.message}", e)
+                _createState.value = HouseholdCreateState.Error(e.message ?: "Failed to create household")
+            }
+        }
+    }
+
+    fun updateHouseholdName(household: Household, newName: String) {
+        viewModelScope.launch {
+            _actionState.value = HouseholdActionState.Loading
+            try {
+                client.postgrest["households"].update(
+                    {
+                        set("household_name", newName)
+                    }
+                ) {
+                    filter {
+                        eq("household_id", household.household_id)
+                    }
+                }
+                
+                _actionState.value = HouseholdActionState.Success("Household name updated")
+                
+                // Refresh detail state
+                val members = fetchMembersData(household.household_id)
+                _detailState.value = HouseholdDetailState.Success(household.copy(household_name = newName), members)
+                fetchHouseholds()
+            } catch (e: Exception) {
+                _actionState.value = HouseholdActionState.Error(e.localizedMessage ?: "Failed to update household name")
             }
         }
     }
@@ -141,18 +159,20 @@ class HouseholdViewModel : ViewModel() {
         viewModelScope.launch {
             _householdListState.value = HouseholdListState.Loading
             try {
-                val userId = AuthRepository.currentUser()?.id ?: run {
+                val userId = client.auth.currentUserOrNull()?.id ?: run {
                     _householdListState.value = HouseholdListState.Error("User not authenticated")
                     return@launch
                 }
-
-                val households = HouseholdRepository.getUserHouseholds(userId)
-                Log.d(TAG, "Fetched ${households.size} households")
+                val memberEntries = client.postgrest["household_members"].select { filter { eq("user_id", userId) } }.decodeList<HouseholdMember>()
+                val householdIds = memberEntries.map { it.household_id }
+                if (householdIds.isEmpty()) {
+                    _householdListState.value = HouseholdListState.Success(emptyList())
+                    return@launch
+                }
+                val households = client.postgrest["households"].select { filter { isIn("household_id", householdIds) } }.decodeList<Household>()
                 _householdListState.value = HouseholdListState.Success(households)
             } catch (e: Exception) {
-                Log.e(TAG, "Error fetching households", e)
-                _householdListState.value =
-                    HouseholdListState.Error(e.localizedMessage ?: "Failed to fetch households")
+                _householdListState.value = HouseholdListState.Error(e.localizedMessage ?: "Failed to fetch households")
             }
         }
     }
@@ -171,9 +191,7 @@ class HouseholdViewModel : ViewModel() {
                     _detailState.value = HouseholdDetailState.Error("Household not found")
                 }
             } catch (e: Exception) {
-                _detailState.value = HouseholdDetailState.Error(
-                    e.localizedMessage ?: "Failed to fetch household details"
-                )
+                _detailState.value = HouseholdDetailState.Error(e.localizedMessage ?: "Failed to fetch details")
             }
         }
     }
@@ -197,9 +215,14 @@ class HouseholdViewModel : ViewModel() {
 
     fun addMemberByEmail(household: Household, email: String) {
         viewModelScope.launch {
+            _addMemberState.value = MemberAddState.Loading
             try {
                 HouseholdRepository.addMemberByEmail(household.household_id, email)
                 _addMemberState.value = MemberAddState.Success
+                
+                val members = fetchMembersData(household.household_id)
+                _detailState.value = HouseholdDetailState.Success(household, members)
+                
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to add member", e)
                 _addMemberState.value =
