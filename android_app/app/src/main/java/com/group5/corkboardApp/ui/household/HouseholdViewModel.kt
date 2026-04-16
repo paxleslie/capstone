@@ -4,61 +4,16 @@ package com.group5.corkboardApp.ui.household
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.group5.corkboardApp.util.SupabaseClient
-import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.postgrest.query.Columns
-import io.github.jan.supabase.postgrest.rpc
+import com.group5.corkboardApp.data.model.Household
+import com.group5.corkboardApp.data.model.HouseholdMember
+import com.group5.corkboardApp.data.repository.AuthRepository
+import com.group5.corkboardApp.data.repository.HouseholdRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
-
-@Serializable
-data class Household(
-    val household_id: String,
-    val household_name: String,
-    val owner_member_id: String? = null,
-    val created_at: String? = null
-)
-
-@Serializable
-data class Profile(
-    val display_name: String? = null,
-    val name: String? = null,
-    val email: String? = null
-)
-
-@Serializable
-data class HouseholdMember(
-    val member_id: String,
-    val user_id: String,
-    val household_id: String,
-    val role: String,
-    val nickname: String? = null,
-    @SerialName("users")
-    val profile: Profile? = null
-)
-
-@Serializable
-data class CreateHouseholdParams(
-    @SerialName("p_household_name")
-    val householdName: String,
-    @SerialName("p_user_id")
-    val userID: String
-)
-
-@Serializable
-data class DeleteHouseholdParams(
-    @SerialName("householdid")
-    val householdId: String
-)
 
 class HouseholdViewModel : ViewModel() {
 
@@ -78,7 +33,11 @@ class HouseholdViewModel : ViewModel() {
         ) : HouseholdListState() {
             val isEmpty get() = households.isEmpty()
         }
-        data class Error(val message: String, val canRetry: Boolean = true) : HouseholdListState()
+
+        data class Error(
+            val message: String,
+            val canRetry: Boolean = true
+        ) : HouseholdListState()
     }
 
     sealed class HouseholdDetailState {
@@ -87,7 +46,10 @@ class HouseholdViewModel : ViewModel() {
         data class Success(
             val household: Household,
             val members: List<HouseholdMember> = emptyList()
-        ) : HouseholdDetailState()
+        ) : HouseholdDetailState() {
+            val isEmpty get() = members.isEmpty()
+        }
+
         data class Error(val message: String) : HouseholdDetailState()
     }
 
@@ -111,21 +73,26 @@ class HouseholdViewModel : ViewModel() {
         data class Error(val message: String) : HouseholdActionState()
     }
 
-    private val client = SupabaseClient.client
+    private val TAG = "HouseholdViewModel"
 
-    private val _householdListState = MutableStateFlow<HouseholdListState>(HouseholdListState.Loading)
+    private val _householdListState =
+        MutableStateFlow<HouseholdListState>(HouseholdListState.Loading)
     val householdListState: StateFlow<HouseholdListState> = _householdListState
 
-    private val _createState = MutableStateFlow<HouseholdCreateState>(HouseholdCreateState.Idle)
+    private val _createState =
+        MutableStateFlow<HouseholdCreateState>(HouseholdCreateState.Idle)
     val createState: StateFlow<HouseholdCreateState> = _createState
 
-    private val _detailState = MutableStateFlow<HouseholdDetailState>(HouseholdDetailState.Idle)
+    private val _detailState =
+        MutableStateFlow<HouseholdDetailState>(HouseholdDetailState.Idle)
     val detailState: StateFlow<HouseholdDetailState> = _detailState
 
-    private val _actionState = MutableStateFlow<HouseholdActionState>(HouseholdActionState.Idle)
+    private val _actionState =
+        MutableStateFlow<HouseholdActionState>(HouseholdActionState.Idle)
     val actionState: StateFlow<HouseholdActionState> = _actionState
 
-    private val _addMemberState = MutableStateFlow<MemberAddState>(MemberAddState.Idle)
+    private val _addMemberState =
+        MutableStateFlow<MemberAddState>(MemberAddState.Idle)
     val addMemberState: StateFlow<MemberAddState> = _addMemberState
 
     private val _navState = MutableStateFlow<NavState>(NavState.Idle)
@@ -133,7 +100,7 @@ class HouseholdViewModel : ViewModel() {
 
     val currentUserMember: StateFlow<HouseholdMember?> = _detailState.map { state ->
         if (state is HouseholdDetailState.Success) {
-            val currentUserId = client.auth.currentUserOrNull()?.id
+            val currentUserId = AuthRepository.currentUser()?.id
             state.members.find { it.user_id == currentUserId }
         } else {
             null
@@ -148,8 +115,12 @@ class HouseholdViewModel : ViewModel() {
         viewModelScope.launch {
             _createState.value = HouseholdCreateState.Loading
             try {
-                val userId = client.auth.currentUserOrNull()?.id ?: throw Exception("User not authenticated")
-                client.postgrest.rpc("create_household", CreateHouseholdParams(householdName = name, userID = userId))
+                val userId = AuthRepository.currentUser()?.id
+                    ?: throw Exception("User not authenticated")
+
+                HouseholdRepository.createHousehold(name, userId)
+
+                Log.d(TAG, "Created household: $name")
                 _createState.value = HouseholdCreateState.Success
                 fetchHouseholds()
             } catch (e: Exception) {
@@ -210,9 +181,10 @@ class HouseholdViewModel : ViewModel() {
         viewModelScope.launch {
             _detailState.value = HouseholdDetailState.Loading
             try {
-                val household = client.postgrest["households"].select { filter { eq("household_id", householdId) } }.decodeList<Household>().firstOrNull()
+                val household = HouseholdRepository.getHouseholdDetails(householdId)
+
                 if (household != null) {
-                    val members = fetchMembersData(householdId)
+                    val members = HouseholdRepository.getMembers(householdId)
                     _detailState.value = HouseholdDetailState.Success(household, members)
                     _navState.value = NavState.Detail
                 } else {
@@ -224,53 +196,54 @@ class HouseholdViewModel : ViewModel() {
         }
     }
 
-    private suspend fun fetchMembersData(householdId: String): List<HouseholdMember> {
-        return try {
-            client.postgrest["household_members"]
-                .select(Columns.raw("*, users(display_name, name, email)")) { filter { eq("household_id", householdId) } }
-                .decodeList<HouseholdMember>()
-        } catch (_: Exception) {
-            client.postgrest["household_members"].select { filter { eq("household_id", householdId) } }.decodeList<HouseholdMember>()
-        }
+    fun navToListHouseholds() {
+        fetchHouseholds()
+        _navState.value = NavState.List
+    }
+
+    fun navToIdle() {
+        _navState.value = NavState.Idle
+    }
+
+    fun resetCreateState() {
+        _createState.value = HouseholdCreateState.Idle
+    }
+
+    fun resetActionState() {
+        _actionState.value = HouseholdActionState.Idle
     }
 
     fun addMemberByEmail(household: Household, email: String) {
         viewModelScope.launch {
             _addMemberState.value = MemberAddState.Loading
             try {
-                val params = buildJsonObject {
-                    put("p_household_id", household.household_id)
-                    put("p_new_member_email", email)
-                }
-                client.postgrest.rpc("add_user_to_household_by_email", params)
+                HouseholdRepository.addMemberByEmail(household.household_id, email)
                 _addMemberState.value = MemberAddState.Success
                 
                 val members = fetchMembersData(household.household_id)
                 _detailState.value = HouseholdDetailState.Success(household, members)
                 
             } catch (e: Exception) {
-                _addMemberState.value = MemberAddState.Error(e.localizedMessage ?: "Failed to add member")
+                Log.e(TAG, "Failed to add member", e)
+                _addMemberState.value =
+                    MemberAddState.Error(e.localizedMessage ?: "Failed to add member")
             }
         }
     }
 
-    fun removeMember(household: Household, memberId: String) {
+    fun removeMember(household: Household, targetUserId: String) {
         viewModelScope.launch {
             _actionState.value = HouseholdActionState.Loading
             try {
-                val params = buildJsonObject {
-                    put("householdid", household.household_id)
-                    put("userid", memberId)
-                }
-                
-                client.postgrest.rpc("remove_household_member", params)
-                _actionState.value = HouseholdActionState.Success("Member removed")
-                
-                val members = fetchMembersData(household.household_id)
-                _detailState.value = HouseholdDetailState.Success(household, members)
+                HouseholdRepository.removeMember(household.household_id, targetUserId)
+                _actionState.value = HouseholdActionState.Success("Member removed successfully")
+                getHouseholdDetails(household.household_id)
                 fetchHouseholds()
             } catch (e: Exception) {
-                _actionState.value = HouseholdActionState.Error(e.localizedMessage ?: "Failed to remove member")
+                Log.e(TAG, "Failed to remove member", e)
+                _actionState.value = HouseholdActionState.Error(
+                    e.localizedMessage ?: "Failed to remove member"
+                )
             }
         }
     }
@@ -279,17 +252,15 @@ class HouseholdViewModel : ViewModel() {
         viewModelScope.launch {
             _actionState.value = HouseholdActionState.Loading
             try {
-                val params = buildJsonObject {
-                    put("householdid", household.household_id)
-                    put("userid", memberId)
-                }
-
-                client.postgrest.rpc("remove_household_member", params)
-                _actionState.value = HouseholdActionState.Success("Left household")
+                HouseholdRepository.removeMember(household.household_id, memberId)
+                _actionState.value = HouseholdActionState.Success("Left household successfully")
                 fetchHouseholds()
                 _navState.value = NavState.List
             } catch (e: Exception) {
-                _actionState.value = HouseholdActionState.Error(e.localizedMessage ?: "Failed to leave household")
+                Log.e(TAG, "Failed to leave household", e)
+                _actionState.value = HouseholdActionState.Error(
+                    e.localizedMessage ?: "Failed to leave household"
+                )
             }
         }
     }
@@ -298,23 +269,16 @@ class HouseholdViewModel : ViewModel() {
         viewModelScope.launch {
             _actionState.value = HouseholdActionState.Loading
             try {
-                client.postgrest.rpc("delete_household", DeleteHouseholdParams(householdId = household.household_id))
-                _actionState.value = HouseholdActionState.Success("Household deleted")
+                HouseholdRepository.deleteHousehold(household.household_id)
+                _actionState.value = HouseholdActionState.Success("Household deleted successfully")
                 fetchHouseholds()
                 _navState.value = NavState.List
             } catch (e: Exception) {
-                _actionState.value = HouseholdActionState.Error(e.localizedMessage ?: "Failed to delete household")
+                Log.e(TAG, "Failed to delete household", e)
+                _actionState.value = HouseholdActionState.Error(
+                    e.localizedMessage ?: "Failed to delete household"
+                )
             }
         }
     }
-
-    fun navToListHouseholds() {
-        fetchHouseholds()
-        _navState.value = NavState.List
-    }
-
-    fun navToIdle() { _navState.value = NavState.Idle }
-    fun resetCreateState() { _createState.value = HouseholdCreateState.Idle }
-    fun resetActionState() { _actionState.value = HouseholdActionState.Idle }
-    fun resetAddMemberState() { _addMemberState.value = MemberAddState.Idle }
 }

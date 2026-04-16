@@ -2,21 +2,11 @@ package com.group5.corkboardApp.ui.userProfile
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.group5.corkboardApp.util.SupabaseClient
-import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.postgrest.postgrest
+import com.group5.corkboardApp.data.repository.AuthRepository
+import com.group5.corkboardApp.data.repository.UserRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import kotlinx.serialization.Serializable
-
-@Serializable
-data class UserProfile(
-    val name: String = "",
-    val email: String = "",
-    val display_name: String = "",
-    val phone: String = ""
-)
 
 class UserProfileViewModel : ViewModel() {
 
@@ -35,7 +25,6 @@ class UserProfileViewModel : ViewModel() {
         data class Error(val message: String) : ProfileState()
     }
 
-    private val client = SupabaseClient.client
     private val _uiState = MutableStateFlow<ProfileState>(ProfileState.Loading)
     val uiState: StateFlow<ProfileState> = _uiState
 
@@ -43,18 +32,12 @@ class UserProfileViewModel : ViewModel() {
         _uiState.value = ProfileState.Loading
         viewModelScope.launch {
             try {
-                val user = client.auth.currentUserOrNull()
+                val user = AuthRepository.currentUser()
 
                 if (user != null) {
-                    val userId = user.id
-                    
-                    // Fetch user info from the 'users' table in the database
-                    val userProfile = client.postgrest["users"].select {
-                        filter { eq("user_id", userId) }
-                    }.decodeSingle<UserProfile>()
-
+                    val userProfile = UserRepository.getUserProfile(user.id)
                     _uiState.value = ProfileState.Success(
-                        userId = userId,
+                        userId = user.id,
                         fullName = userProfile.name,
                         email = userProfile.email,
                         displayName = userProfile.display_name,
@@ -71,7 +54,7 @@ class UserProfileViewModel : ViewModel() {
 
     fun signOut() {
         viewModelScope.launch {
-            client.auth.signOut()
+            AuthRepository.signOut()
         }
     }
 }
