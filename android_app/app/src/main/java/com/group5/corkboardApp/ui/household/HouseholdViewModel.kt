@@ -2,6 +2,7 @@
 
 package com.group5.corkboardApp.ui.household
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.group5.corkboardApp.data.model.Household
@@ -133,20 +134,12 @@ class HouseholdViewModel : ViewModel() {
         viewModelScope.launch {
             _actionState.value = HouseholdActionState.Loading
             try {
-                client.postgrest["households"].update(
-                    {
-                        set("household_name", newName)
-                    }
-                ) {
-                    filter {
-                        eq("household_id", household.household_id)
-                    }
-                }
-                
+                HouseholdRepository.updateHouseholdName(household.household_id, newName)
+
                 _actionState.value = HouseholdActionState.Success("Household name updated")
-                
+
                 // Refresh detail state
-                val members = fetchMembersData(household.household_id)
+                val members = HouseholdRepository.getMembers(household.household_id)
                 _detailState.value = HouseholdDetailState.Success(household.copy(household_name = newName), members)
                 fetchHouseholds()
             } catch (e: Exception) {
@@ -159,17 +152,11 @@ class HouseholdViewModel : ViewModel() {
         viewModelScope.launch {
             _householdListState.value = HouseholdListState.Loading
             try {
-                val userId = client.auth.currentUserOrNull()?.id ?: run {
+                val userId = AuthRepository.currentUser()?.id ?: run {
                     _householdListState.value = HouseholdListState.Error("User not authenticated")
                     return@launch
                 }
-                val memberEntries = client.postgrest["household_members"].select { filter { eq("user_id", userId) } }.decodeList<HouseholdMember>()
-                val householdIds = memberEntries.map { it.household_id }
-                if (householdIds.isEmpty()) {
-                    _householdListState.value = HouseholdListState.Success(emptyList())
-                    return@launch
-                }
-                val households = client.postgrest["households"].select { filter { isIn("household_id", householdIds) } }.decodeList<Household>()
+                val households = HouseholdRepository.getUserHouseholds(userId)
                 _householdListState.value = HouseholdListState.Success(households)
             } catch (e: Exception) {
                 _householdListState.value = HouseholdListState.Error(e.localizedMessage ?: "Failed to fetch households")
@@ -213,6 +200,10 @@ class HouseholdViewModel : ViewModel() {
         _actionState.value = HouseholdActionState.Idle
     }
 
+    fun resetAddMemberState() {
+        _addMemberState.value = MemberAddState.Idle
+    }
+
     fun addMemberByEmail(household: Household, email: String) {
         viewModelScope.launch {
             _addMemberState.value = MemberAddState.Loading
@@ -220,9 +211,9 @@ class HouseholdViewModel : ViewModel() {
                 HouseholdRepository.addMemberByEmail(household.household_id, email)
                 _addMemberState.value = MemberAddState.Success
                 
-                val members = fetchMembersData(household.household_id)
+                val members = HouseholdRepository.getMembers(household.household_id)
                 _detailState.value = HouseholdDetailState.Success(household, members)
-                
+
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to add member", e)
                 _addMemberState.value =

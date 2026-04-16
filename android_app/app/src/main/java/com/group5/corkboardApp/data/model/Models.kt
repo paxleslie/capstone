@@ -24,6 +24,7 @@ data class HouseholdMember(
     val user_id: String,
     val household_id: String,
     val role: String,
+    val nickname: String,
     // the actual table is called users
     @SerialName("users")
     val profile: Profile? = null

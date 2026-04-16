@@ -78,6 +78,14 @@ object HouseholdRepository {
         }
     }
 
+    suspend fun updateHouseholdName(householdId: String, newName: String) {
+        client.postgrest["households"].update(
+            { set("household_name", newName) }
+        ) {
+            filter { eq("household_id", householdId) }
+        }
+    }
+
     suspend fun createHousehold(name: String, userId: String) {
         client.postgrest.rpc(
             "create_household",
