@@ -46,11 +46,47 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.group5.corkboardApp.data.model.Post
+
+class DateVisualTransformation : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val digits = text.text.filter { it.isDigit() }
+        val out = StringBuilder()
+
+        for (i in digits.indices) {
+            out.append(digits[i])
+            if (i == 1 || i == 3) out.append("/")
+        }
+
+        val formattedText = out.toString().take(10) // MM/DD/YYYY is 10 chars
+
+        val offsetMapping = object : OffsetMapping {
+            override fun originalToTransformed(offset: Int): Int {
+                if (offset <= 2) return offset
+                if (offset <= 4) return offset + 1
+                if (offset <= 8) return offset + 2
+                return formattedText.length
+            }
+
+            override fun transformedToOriginal(offset: Int): Int {
+                if (offset <= 2) return offset
+                if (offset <= 5) return offset - 1
+                if (offset <= 10) return offset - 2
+                return digits.length
+            }
+        }
+
+        return TransformedText(AnnotatedString(formattedText), offsetMapping)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,7 +107,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     var body by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf("note") }
     var pointValue by remember { mutableStateOf("") }
-    var dueAt by remember { mutableStateOf("") }
+    var dueAt by remember { mutableStateOf("") } // Store raw digits
     var householdDropdownExpanded by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
 
@@ -154,10 +190,12 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                     )
                 }
                 is BoardViewModel.PostsLoadState.Success -> {
-                    val visiblePosts = if (selectedHouseholdId != null)
-                        state.posts.filter { it.household_id == selectedHouseholdId }
-                    else
-                        state.posts
+                    // Filter to only show active items: Notes and Pending Chores
+                    val visiblePosts = state.posts.filter { post ->
+                        val hidMatch = selectedHouseholdId == null || post.household_id == selectedHouseholdId
+                        val isActive = post.type == "note" || post.status == "pending"
+                        hidMatch && isActive
+                    }
 
                     if (visiblePosts.isEmpty()) {
                         Text(
@@ -176,7 +214,10 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                             items(visiblePosts, key = { it.post_id ?: it.hashCode() }) { post ->
                                 PostCard(
                                     post = post,
-                                    onEdit = { postToEdit = post },
+                                    onEdit = { 
+                                        postToEdit = post 
+                                        dueAt = post.due_at?.filter { it.isDigit() } ?: ""
+                                    },
                                     onDelete = { postToDelete = post },
                                     onComplete = { viewModel.completeChore(post) }
                                 )
@@ -203,7 +244,6 @@ fun BoardScreen(modifier: Modifier = Modifier) {
             title = { Text("Create Post") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Type selector
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(
                             selected = selectedType == "note",
@@ -240,7 +280,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                     if (selectedType == "chore") {
                         OutlinedTextField(
                             value = pointValue,
-                            onValueChange = { pointValue = it },
+                            onValueChange = { if (it.all { char -> char.isDigit() }) pointValue = it },
                             label = { Text("Point Value") },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -249,15 +289,19 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                         )
                         OutlinedTextField(
                             value = dueAt,
-                            onValueChange = { dueAt = it },
-                            label = { Text("Due Date (YYYY-MM-DD)") },
+                            onValueChange = { input ->
+                                val digitsOnly = input.filter { it.isDigit() }
+                                if (digitsOnly.length <= 8) dueAt = digitsOnly
+                            },
+                            label = { Text("Due Date (MM/DD/YYYY)") },
+                            visualTransformation = DateVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !isLoading
                         )
                     }
 
-                    // Household dropdown
                     ExposedDropdownMenuBox(
                         expanded = householdDropdownExpanded,
                         onExpandedChange = { if (!isLoading) householdDropdownExpanded = it }
@@ -303,13 +347,17 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                         } else if (hid == null) {
                             errorText = "Please select a household"
                         } else {
+                            val formattedDate = if (dueAt.length == 8) {
+                                "${dueAt.substring(4, 8)}-${dueAt.substring(0, 2)}-${dueAt.substring(2, 4)}"
+                            } else null
+
                             viewModel.createPost(
                                 title = title.trim(),
                                 body = body.trim(),
                                 type = selectedType,
                                 householdId = hid,
                                 pointValue = pointValue.toIntOrNull(),
-                                dueAt = dueAt.ifBlank { null }
+                                dueAt = formattedDate
                             )
                         }
                     },
@@ -329,13 +377,12 @@ fun BoardScreen(modifier: Modifier = Modifier) {
         )
     }
 
-    // Edit dialog
     postToEdit?.let { post ->
         val actionLoading = postActionState is BoardViewModel.PostActionState.Loading
         var editTitle by remember(post.post_id) { mutableStateOf(post.title ?: "") }
         var editBody by remember(post.post_id) { mutableStateOf(post.body ?: "") }
         var editPointValue by remember(post.post_id) { mutableStateOf(post.point_value?.toString() ?: "") }
-        var editDueAt by remember(post.post_id) { mutableStateOf(post.due_at ?: "") }
+        var editDueAt by remember(post.post_id) { mutableStateOf(post.due_at?.filter { it.isDigit() } ?: "") }
         var editError by remember(post.post_id) { mutableStateOf<String?>(null) }
 
         AlertDialog(
@@ -362,7 +409,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                     if (post.type == "chore") {
                         OutlinedTextField(
                             value = editPointValue,
-                            onValueChange = { editPointValue = it },
+                            onValueChange = { if (it.all { char -> char.isDigit() }) editPointValue = it },
                             label = { Text("Point Value") },
                             singleLine = true,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -371,8 +418,13 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                         )
                         OutlinedTextField(
                             value = editDueAt,
-                            onValueChange = { editDueAt = it },
-                            label = { Text("Due Date (YYYY-MM-DD)") },
+                            onValueChange = { input ->
+                                val digitsOnly = input.filter { it.isDigit() }
+                                if (digitsOnly.length <= 8) editDueAt = digitsOnly
+                            },
+                            label = { Text("Due Date (MM/DD/YYYY)") },
+                            visualTransformation = DateVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             enabled = !actionLoading
@@ -390,12 +442,16 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                         if (editTitle.isBlank()) {
                             editError = "Title cannot be empty"
                         } else {
+                            val formattedDate = if (editDueAt.length == 8) {
+                                "${editDueAt.substring(4, 8)}-${editDueAt.substring(0, 2)}-${editDueAt.substring(2, 4)}"
+                            } else null
+
                             viewModel.updatePost(
                                 post = post,
                                 title = editTitle.trim(),
                                 body = editBody.trim(),
                                 pointValue = editPointValue.toIntOrNull(),
-                                dueAt = editDueAt.ifBlank { null }
+                                dueAt = formattedDate
                             )
                         }
                     },
@@ -413,7 +469,6 @@ fun BoardScreen(modifier: Modifier = Modifier) {
         )
     }
 
-    // Delete confirmation
     postToDelete?.let { post ->
         val actionLoading = postActionState is BoardViewModel.PostActionState.Loading
         AlertDialog(
@@ -499,7 +554,10 @@ private fun PostCard(
                             Text(text = "$it pts", style = MaterialTheme.typography.labelSmall)
                         }
                         post.due_at?.let {
-                            Text(text = "Due: $it", style = MaterialTheme.typography.labelSmall)
+                            val displayDate = if (it.length == 10 && it[4] == '-' && it[7] == '-') {
+                                "${it.substring(5, 7)}/${it.substring(8, 10)}/${it.substring(0, 4)}"
+                            } else it
+                            Text(text = "Due: $displayDate", style = MaterialTheme.typography.labelSmall)
                         }
                     }
                     if (post.status == "pending") {

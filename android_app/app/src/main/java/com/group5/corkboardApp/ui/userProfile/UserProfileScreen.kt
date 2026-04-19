@@ -2,11 +2,13 @@ package com.group5.corkboardApp.ui.userProfile
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
@@ -38,6 +40,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.group5.corkboardApp.data.model.HouseholdMember
 import com.group5.corkboardApp.ui.household.HouseholdViewModel
 
 @Composable
@@ -64,6 +67,11 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
     
     var showRenameDialog by remember { mutableStateOf(false) }
     var renamedHouseholdName by remember { mutableStateOf("") }
+
+    // MVVM Point editing state
+    val showEditPointsDialog by householdViewModel.showEditPointsDialog.collectAsState()
+    val editPointsMember by householdViewModel.editPointsMember.collectAsState()
+    val editPointsValue by householdViewModel.editPointsValue.collectAsState()
     
     val focusManager = LocalFocusManager.current
 
@@ -94,9 +102,11 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
     }
     
     LaunchedEffect(actionState) {
-        if (actionState is HouseholdViewModel.HouseholdActionState.Success && showRenameDialog) {
-            showRenameDialog = false
-            renamedHouseholdName = ""
+        if (actionState is HouseholdViewModel.HouseholdActionState.Success) {
+            if (showRenameDialog) {
+                showRenameDialog = false
+                renamedHouseholdName = ""
+            }
         }
     }
 
@@ -276,17 +286,40 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                                 ?: profile?.name
                                 ?: "User (${member.user_id.take(8)}...)"
 
-                                            Text(text = nameToShow, style = MaterialTheme.typography.bodyLarge)
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Text(
+                                                    text = nameToShow,
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Text(
+                                                    text = "(${member.total_points ?: 0} pts)",
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = MaterialTheme.colorScheme.primary
+                                                )
+                                            }
                                             Text(text = "Role: ${member.role}", style = MaterialTheme.typography.bodySmall)
 
-                                            // FIX: Pass member.member_id instead of user_id to match DB logic
-                                            if (isAdmin && member.user_id != currentUserId) {
-                                                Button(
-                                                    onClick = { householdViewModel.removeMember(dState.household, member.member_id) },
-                                                    modifier = Modifier.padding(top = 4.dp),
-                                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
-                                                ) {
-                                                    Text("Remove User")
+                                            if (isAdmin) {
+                                                Row(modifier = Modifier.padding(top = 4.dp)) {
+                                                    Button(
+                                                        onClick = { householdViewModel.startEditingPoints(member) },
+                                                        modifier = Modifier.weight(1f)
+                                                    ) {
+                                                        Text("Edit Points")
+                                                    }
+                                                    
+                                                    if (member.user_id != currentUserId) {
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Button(
+                                                            onClick = { householdViewModel.removeMember(dState.household, member.member_id) },
+                                                            modifier = Modifier.weight(1f),
+                                                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
+                                                        ) {
+                                                            Text("Remove User")
+                                                        }
+                                                    }
                                                 }
                                             }
                                             HorizontalDivider()
@@ -294,7 +327,6 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                                     }
                                 }
 
-                                // Layout Fix: Reordered buttons and changed styles
                                 Button(
                                     onClick = { householdViewModel.navToListHouseholds() },
                                     modifier = Modifier.fillMaxWidth()
@@ -459,6 +491,66 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
             dismissButton = {
                 TextButton(
                     onClick = { showRenameDialog = false },
+                    enabled = actionState !is HouseholdViewModel.HouseholdActionState.Loading
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showEditPointsDialog && editPointsMember != null) {
+        val dState = householdDetailState as? HouseholdViewModel.HouseholdDetailState.Success
+        AlertDialog(
+            onDismissRequest = {
+                if (actionState !is HouseholdViewModel.HouseholdActionState.Loading) {
+                    householdViewModel.cancelEditingPoints()
+                }
+            },
+            title = { Text("Edit Points for ${editPointsMember?.nickname ?: editPointsMember?.profile?.display_name ?: "Member"}") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = editPointsValue,
+                        onValueChange = { householdViewModel.onEditPointsValueChange(it) },
+                        label = { Text("Points") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = actionState !is HouseholdViewModel.HouseholdActionState.Loading,
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                if (dState != null) {
+                                    focusManager.clearFocus()
+                                    householdViewModel.saveMemberPoints(dState.household.household_id)
+                                }
+                            }
+                        )
+                    )
+                    if (actionState is HouseholdViewModel.HouseholdActionState.Error) {
+                        Text(text = (actionState as HouseholdViewModel.HouseholdActionState.Error).message, color = Color.Red)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (dState != null) {
+                            focusManager.clearFocus()
+                            householdViewModel.saveMemberPoints(dState.household.household_id)
+                        }
+                    },
+                    enabled = actionState !is HouseholdViewModel.HouseholdActionState.Loading
+                ) {
+                    if (actionState is HouseholdViewModel.HouseholdActionState.Loading) {
+                        CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
+                    } else {
+                        Text("Save")
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { householdViewModel.cancelEditingPoints() },
                     enabled = actionState !is HouseholdViewModel.HouseholdActionState.Loading
                 ) {
                     Text("Cancel")
