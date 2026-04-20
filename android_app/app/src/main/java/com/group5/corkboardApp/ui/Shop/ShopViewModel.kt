@@ -72,6 +72,9 @@ class ShopViewModel : ViewModel() {
             selectedHouseholdId.collectLatest { id ->
                 if (id != null) {
                     loadShopData()
+                } else {
+                    _shopState.value = ShopState.Loading
+                    _households.value = emptyList()
                 }
             }
         }
@@ -88,7 +91,15 @@ class ShopViewModel : ViewModel() {
                 val userHouseholds = HouseholdRepository.getUserHouseholds(userId)
                 _households.value = userHouseholds
                 
-                if (SessionManager.selectedHouseholdId.value == null && userHouseholds.isNotEmpty()) {
+                // If current selected ID is not in the new list, reset it
+                val currentId = SessionManager.selectedHouseholdId.value
+                if (currentId != null && userHouseholds.none { it.household_id == currentId }) {
+                    if (userHouseholds.isNotEmpty()) {
+                        selectHousehold(userHouseholds.first().household_id)
+                    } else {
+                        SessionManager.selectHousehold(null)
+                    }
+                } else if (currentId == null && userHouseholds.isNotEmpty()) {
                     selectHousehold(userHouseholds.first().household_id)
                 }
             } catch (e: Exception) {
@@ -105,13 +116,13 @@ class ShopViewModel : ViewModel() {
             val member = memberships.find { it.household_id == hid } ?: throw Exception("Not a member")
 
             // 1. Get available items from rewards table
-            val dbItems = try { ShopRepository.getShopItems(hid) } catch (e: Exception) { emptyList() }
+            val dbItems = try { ShopRepository.getShopItems(hid) } catch (_: Exception) { emptyList() }
             
             // 2. Merge with defaults, prioritizing DB items to get real IDs
             val finalItems = (dbItems + universalItems).distinctBy { it.name }
 
             // 3. Get currently owned items for this member
-            val ownedRewardIds = try { ShopRepository.getOwnedItems(member.member_id!!, hid) } catch (e: Exception) { emptyList() }
+            val ownedRewardIds = try { ShopRepository.getOwnedItems(member.member_id, hid) } catch (_: Exception) { emptyList() }
             
             Log.d("ShopViewModel", "Found ${ownedRewardIds.size} owned reward IDs in DB for member ${member.member_id}")
 
@@ -170,8 +181,8 @@ class ShopViewModel : ViewModel() {
                 val member = memberships.find { it.household_id == hid } ?: throw Exception("Not a member")
                 
                 // 2. Database-level safety check (Name-based)
-                // Fetch fresh data to ensure we aren't buying twice
-                val freshOwnedIds = ShopRepository.getOwnedItems(member.member_id!!, hid)
+                // Freshly fetch data to ensure we aren't buying twice
+                val freshOwnedIds = ShopRepository.getOwnedItems(member.member_id, hid)
                 val dbItems = ShopRepository.getShopItems(hid)
                 val ownedNames = (dbItems + universalItems).filter { it.id in freshOwnedIds }.map { it.name }
                 
@@ -194,7 +205,7 @@ class ShopViewModel : ViewModel() {
                 }
 
                 // 3. Perform purchase
-                ShopRepository.buyItem(member.member_id!!, hid, itemIdToBuy, item.price)
+                ShopRepository.buyItem(member.member_id, hid, itemIdToBuy, item.price)
                 
                 // 4. Force a refresh and wait for it to complete
                 refreshShopDataInternal()

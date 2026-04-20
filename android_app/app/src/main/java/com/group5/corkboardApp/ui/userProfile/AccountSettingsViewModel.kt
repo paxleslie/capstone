@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.group5.corkboardApp.data.model.UserProfile
 import com.group5.corkboardApp.data.repository.AuthRepository
 import com.group5.corkboardApp.data.repository.UserRepository
+import com.group5.corkboardApp.util.SessionManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -129,6 +130,7 @@ class AccountSettingsViewModel : ViewModel() {
 
     fun signOut() {
         viewModelScope.launch {
+            SessionManager.clear()
             AuthRepository.signOut()
         }
     }
