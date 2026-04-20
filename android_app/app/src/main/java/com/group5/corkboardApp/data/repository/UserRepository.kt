@@ -5,7 +5,7 @@ import com.group5.corkboardApp.util.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 
 object UserRepository {
-    private val client = SupabaseClient.client
+    private val client by lazy { SupabaseClient.client }
 
     suspend fun getUserProfile(userId: String): UserProfile {
         return client.postgrest["users"]

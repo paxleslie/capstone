@@ -32,7 +32,7 @@ private data class DeleteHouseholdParams(
 
 object HouseholdRepository {
     private val TAG = "HouseholdRepository"
-    private val client = SupabaseClient.client
+    private val client by lazy { SupabaseClient.client }
 
     suspend fun getUserHouseholds(userId: String): List<Household> {
         val memberships = getUserMemberships(userId)

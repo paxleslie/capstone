@@ -7,7 +7,7 @@ import io.github.jan.supabase.auth.user.UserInfo
 import kotlinx.serialization.json.JsonObject
 
 object AuthRepository {
-    private val client = SupabaseClient.client
+    private val client by lazy { SupabaseClient.client }
 
     suspend fun signIn(email: String, password: String) {
         client.auth.signInWith(Email) {
