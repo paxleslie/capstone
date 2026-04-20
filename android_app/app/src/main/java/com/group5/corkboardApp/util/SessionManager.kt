@@ -13,4 +13,8 @@ object SessionManager {
     fun selectHousehold(id: String?) {
         _selectedHouseholdId.value = id
     }
+
+    fun clear() {
+        _selectedHouseholdId.value = null
+    }
 }

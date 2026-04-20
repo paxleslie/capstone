@@ -66,6 +66,11 @@ fun ShopScreen(modifier: Modifier = Modifier) {
     
     val snackbarHostState = remember { SnackbarHostState() }
 
+    // Refresh households whenever the screen is shown
+    LaunchedEffect(Unit) {
+        viewModel.loadHouseholds()
+    }
+
     LaunchedEffect(purchaseState) {
         when (val state = purchaseState) {
             is ShopViewModel.PurchaseState.Success -> {
@@ -99,7 +104,7 @@ fun ShopScreen(modifier: Modifier = Modifier) {
                             modifier = Modifier.handDrawnBorder(),
                             shape = RoundedCornerShape(0.dp),
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFFD1C4E9), // Light purple like image
+                                selectedContainerColor = Color(0xFFD1C4E9), // Matching light purple
                                 containerColor = Color.White
                             )
                         )
@@ -235,8 +240,8 @@ fun ShopItemCard(item: ShopItem, isOwned: Boolean, onBuy: () -> Unit) {
                 colors = ButtonDefaults.buttonColors(
                     containerColor = PostItMagenta,
                     contentColor = Color.White,
-                    disabledContainerColor = Color.Gray,
-                    disabledContentColor = Color.White
+                    disabledContainerColor = Color.LightGray,
+                    disabledContentColor = Color.DarkGray
                 ),
                 contentPadding = PaddingValues(0.dp)
             ) {

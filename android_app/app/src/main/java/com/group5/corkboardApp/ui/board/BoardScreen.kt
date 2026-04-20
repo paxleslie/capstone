@@ -35,6 +35,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -66,7 +67,6 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.group5.corkboardApp.data.model.Post
-import com.group5.corkboardApp.data.model.ShopItem
 import com.group5.corkboardApp.ui.theme.PostItCyan
 import com.group5.corkboardApp.ui.theme.handDrawnBorder
 
@@ -221,9 +221,13 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                     FilterChip(
                         selected = household.household_id == selectedHouseholdId,
                         onClick = { viewModel.selectHousehold(household.household_id) },
-                        label = { Text(household.household_name) },
+                        label = { Text(household.household_name, color = Color.Black) },
                         modifier = Modifier.handDrawnBorder(),
-                        shape = RoundedCornerShape(0.dp)
+                        shape = RoundedCornerShape(0.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xFFD1C4E9), // Matching light purple
+                            containerColor = Color.White
+                        )
                     )
                 }
             }
