@@ -1,5 +1,7 @@
 package com.group5.corkboardApp.ui.board
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,9 +11,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -36,6 +40,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -47,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
@@ -60,6 +66,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.group5.corkboardApp.data.model.Post
+import com.group5.corkboardApp.data.model.ShopItem
 import com.group5.corkboardApp.ui.theme.PostItCyan
 import com.group5.corkboardApp.ui.theme.handDrawnBorder
 
@@ -77,17 +84,15 @@ class DateVisualTransformation : VisualTransformation {
 
         val offsetMapping = object : OffsetMapping {
             override fun originalToTransformed(offset: Int): Int {
-                if (offset <= 2) return offset
-                if (offset <= 4) return offset + 1
-                if (offset <= 8) return offset + 2
-                return formattedText.length
+                if (offset <= 1) return offset
+                if (offset <= 3) return offset + 1
+                return (offset + 2).coerceAtMost(formattedText.length)
             }
 
             override fun transformedToOriginal(offset: Int): Int {
                 if (offset <= 2) return offset
                 if (offset <= 5) return offset - 1
-                if (offset <= 10) return offset - 2
-                return digits.length
+                return (offset - 2).coerceAtMost(digits.length)
             }
         }
 
@@ -104,6 +109,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     val postsLoadState by viewModel.postsLoadState.collectAsState()
     val postActionState by viewModel.postActionState.collectAsState()
     val selectedHouseholdId by viewModel.selectedHouseholdId.collectAsState()
+    val ownedColors by viewModel.ownedColors.collectAsState()
 
     LaunchedEffect(Unit) { viewModel.loadHouseholds() }
 
@@ -117,6 +123,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     var selectedType by remember { mutableStateOf("note") }
     var pointValue by remember { mutableStateOf("") }
     var dueAt by remember { mutableStateOf("") }
+    var selectedColor by remember { mutableStateOf<String?>(null) }
     var householdDropdownExpanded by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
 
@@ -132,6 +139,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                 selectedType = "note"
                 pointValue = ""
                 dueAt = ""
+                selectedColor = null
                 errorText = null
                 viewModel.resetCreateState()
             }
@@ -160,6 +168,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
         selectedType = "note"
         pointValue = ""
         dueAt = ""
+        selectedColor = null
         errorText = null
         viewModel.resetCreateState()
     }
@@ -181,12 +190,24 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                 type = selectedType,
                 householdId = hid,
                 pointValue = pointValue.toIntOrNull(),
-                dueAt = formattedDate
+                dueAt = formattedDate,
+                color = selectedColor
             )
         }
     }
 
     val isLoading = createPostState is BoardViewModel.CreatePostState.Loading
+
+    // Shared colors for text fields to ensure black visibility
+    val blackTextFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = Color.Black,
+        unfocusedTextColor = Color.Black,
+        focusedLabelColor = Color.Black,
+        unfocusedLabelColor = Color.Black,
+        cursorColor = Color.Black,
+        focusedPlaceholderColor = Color.Gray,
+        unfocusedPlaceholderColor = Color.Gray
+    )
 
     Column(modifier = modifier.fillMaxSize()) {
         if (households.isNotEmpty()) {
@@ -271,7 +292,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     if (showCreateDialog) {
         AlertDialog(
             onDismissRequest = { if (!isLoading) resetDialogState() },
-            title = { Text("Create Post") },
+            title = { Text("Create Post", color = Color.Black) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -302,7 +323,8 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                         shape = RoundedCornerShape(0.dp),
                         enabled = !isLoading,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                        keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+                        keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                        colors = blackTextFieldColors
                     )
 
                     OutlinedTextField(
@@ -322,7 +344,8 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                                     handleCreatePost()
                                 }
                             }
-                        )
+                        ),
+                        colors = blackTextFieldColors
                     )
 
                     if (selectedType == "chore") {
@@ -335,7 +358,8 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                             keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                             modifier = Modifier.fillMaxWidth().handDrawnBorder(),
                             shape = RoundedCornerShape(0.dp),
-                            enabled = !isLoading
+                            enabled = !isLoading,
+                            colors = blackTextFieldColors
                         )
                         OutlinedTextField(
                             value = dueAt,
@@ -353,8 +377,46 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth().handDrawnBorder(),
                             shape = RoundedCornerShape(0.dp),
-                            enabled = !isLoading
+                            enabled = !isLoading,
+                            colors = blackTextFieldColors
                         )
+                    }
+
+                    if (ownedColors.isNotEmpty()) {
+                        Text("Post Color", style = MaterialTheme.typography.labelMedium, color = Color.Black)
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(PostItCyan)
+                                        .clickable { selectedColor = null }
+                                        .handDrawnBorder(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (selectedColor == null) {
+                                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.Black))
+                                    }
+                                }
+                            }
+                            items(ownedColors) { colorItem ->
+                                val color = try { Color(android.graphics.Color.parseColor(colorItem.value)) } catch (e: Exception) { Color.Gray }
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(color)
+                                        .clickable { selectedColor = colorItem.value }
+                                        .handDrawnBorder(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (selectedColor == colorItem.value) {
+                                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.Black))
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     ExposedDropdownMenuBox(
@@ -372,7 +434,8 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                                 .menuAnchor(MenuAnchorType.PrimaryNotEditable)
                                 .handDrawnBorder(),
                             shape = RoundedCornerShape(0.dp),
-                            enabled = !isLoading
+                            enabled = !isLoading,
+                            colors = blackTextFieldColors
                         )
                         ExposedDropdownMenu(
                             expanded = householdDropdownExpanded,
@@ -380,7 +443,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                         ) {
                             households.forEach { household ->
                                 DropdownMenuItem(
-                                    text = { Text(household.household_name) },
+                                    text = { Text(household.household_name, color = Color.Black) },
                                     onClick = {
                                         viewModel.selectHousehold(household.household_id)
                                         householdDropdownExpanded = false
@@ -428,6 +491,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
         var editBody by remember(post.post_id) { mutableStateOf(post.body ?: "") }
         var editPointValue by remember(post.post_id) { mutableStateOf(post.point_value?.toString() ?: "") }
         var editDueAt by remember(post.post_id) { mutableStateOf(post.due_at?.filter { it.isDigit() } ?: "") }
+        var editColor by remember(post.post_id) { mutableStateOf(post.color) }
         var editError by remember(post.post_id) { mutableStateOf<String?>(null) }
 
         fun handleUpdatePost() {
@@ -443,14 +507,15 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                     title = editTitle.trim(),
                     body = editBody.trim(),
                     pointValue = editPointValue.toIntOrNull(),
-                    dueAt = formattedDate
+                    dueAt = formattedDate,
+                    color = editColor
                 )
             }
         }
 
         AlertDialog(
             onDismissRequest = { if (!actionLoading) { postToEdit = null; viewModel.resetActionState() } },
-            title = { Text("Edit Post") },
+            title = { Text("Edit Post", color = Color.Black) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -462,7 +527,8 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                         shape = RoundedCornerShape(0.dp),
                         enabled = !actionLoading,
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-                        keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+                        keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                        colors = blackTextFieldColors
                     )
                     OutlinedTextField(
                         value = editBody,
@@ -481,7 +547,8 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                                     handleUpdatePost()
                                 }
                             }
-                        )
+                        ),
+                        colors = blackTextFieldColors
                     )
                     if (post.type == "chore") {
                         OutlinedTextField(
@@ -493,7 +560,8 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                             keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                             modifier = Modifier.fillMaxWidth().handDrawnBorder(),
                             shape = RoundedCornerShape(0.dp),
-                            enabled = !actionLoading
+                            enabled = !actionLoading,
+                            colors = blackTextFieldColors
                         )
                         OutlinedTextField(
                             value = editDueAt,
@@ -511,9 +579,48 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth().handDrawnBorder(),
                             shape = RoundedCornerShape(0.dp),
-                            enabled = !actionLoading
+                            enabled = !actionLoading,
+                            colors = blackTextFieldColors
                         )
                     }
+
+                    if (ownedColors.isNotEmpty()) {
+                        Text("Post Color", style = MaterialTheme.typography.labelMedium, color = Color.Black)
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(PostItCyan)
+                                        .clickable { editColor = null }
+                                        .handDrawnBorder(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (editColor == null) {
+                                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.Black))
+                                    }
+                                }
+                            }
+                            items(ownedColors) { colorItem ->
+                                val color = try { Color(android.graphics.Color.parseColor(colorItem.value)) } catch (e: Exception) { Color.Gray }
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(color)
+                                        .clickable { editColor = colorItem.value }
+                                        .handDrawnBorder(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (editColor == colorItem.value) {
+                                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.Black))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     editError?.let { Text(text = it, color = Color.Red) }
                     (postActionState as? BoardViewModel.PostActionState.Error)?.let {
                         Text(text = it.message, color = Color.Red)
@@ -549,8 +656,8 @@ fun BoardScreen(modifier: Modifier = Modifier) {
         val actionLoading = postActionState is BoardViewModel.PostActionState.Loading
         AlertDialog(
             onDismissRequest = { if (!actionLoading) { postToDelete = null; viewModel.resetActionState() } },
-            title = { Text("Delete Post") },
-            text = { Text("Are you sure you want to delete \"${post.title ?: "this post"}\"?") },
+            title = { Text("Delete Post", color = Color.Black) },
+            text = { Text("Are you sure you want to delete \"${post.title ?: "this post"}\"?", color = Color.Black) },
             confirmButton = {
                 Button(
                     onClick = { viewModel.deletePost(post.post_id!!) },
@@ -582,11 +689,15 @@ private fun PostCard(
     onDelete: () -> Unit,
     onComplete: () -> Unit
 ) {
+    val backgroundColor = post.color?.let { 
+        try { Color(android.graphics.Color.parseColor(it)) } catch (e: Exception) { PostItCyan }
+    } ?: PostItCyan
+
     Card(
         modifier = Modifier.fillMaxWidth().handDrawnBorder(),
         shape = RoundedCornerShape(0.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = PostItCyan)
+        colors = CardDefaults.cardColors(containerColor = backgroundColor)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -599,16 +710,17 @@ private fun PostCard(
                         text = it,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        color = Color.Black
                     )
                 }
                 Text(
                     text = post.type.replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.primary
+                    color = Color.Black
                 )
                 IconButton(onClick = onEdit) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.padding(4.dp))
+                    Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.padding(4.dp), tint = Color.Black)
                 }
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.padding(4.dp))
@@ -616,7 +728,7 @@ private fun PostCard(
             }
             post.body?.let {
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(text = it, style = MaterialTheme.typography.bodyMedium)
+                Text(text = it, style = MaterialTheme.typography.bodyMedium, color = Color.Black)
             }
             if (post.type == "chore") {
                 Spacer(modifier = Modifier.height(4.dp))
@@ -630,25 +742,27 @@ private fun PostCard(
                             post.status?.let {
                                 Text(
                                     text = it.replaceFirstChar { c -> c.uppercase() },
-                                    style = MaterialTheme.typography.labelSmall
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.Black
                                 )
                             }
                             post.point_value?.let {
-                                Text(text = "$it pts", style = MaterialTheme.typography.labelSmall)
+                                Text(text = "$it pts", style = MaterialTheme.typography.labelSmall, color = Color.Black)
                             }
                         }
                         post.due_at?.let {
                             val displayDate = if (it.length == 10 && it[4] == '-' && it[7] == '-') {
                                 "${it.substring(5, 7)}/${it.substring(8, 10)}/${it.substring(0, 4)}"
                             } else it
-                            Text(text = "Due: $displayDate", style = MaterialTheme.typography.labelSmall)
+                            Text(text = "Due: $displayDate", style = MaterialTheme.typography.labelSmall, color = Color.Black)
                         }
                     }
                     if (post.status == "pending") {
                         Button(
                             onClick = onComplete,
                             modifier = Modifier.handDrawnBorder(),
-                            shape = RoundedCornerShape(0.dp)
+                            shape = RoundedCornerShape(0.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
                         ) {
                             Text("Complete", style = MaterialTheme.typography.labelSmall)
                         }

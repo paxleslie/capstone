@@ -26,6 +26,7 @@ import com.group5.corkboardApp.ui.auth.SignupScreen
 import com.group5.corkboardApp.ui.board.BoardScreen
 import com.group5.corkboardApp.ui.userProfile.UserProfileScreen
 import com.group5.corkboardApp.ui.message.MessageScreen
+import com.group5.corkboardApp.ui.Shop.ShopScreen
 import com.group5.corkboardApp.ui.theme.MyApplicationTheme
 import com.group5.corkboardApp.util.Constants
 import com.group5.corkboardApp.util.SupabaseClient
@@ -104,13 +105,6 @@ fun MyApplicationApp() {
                 Constants.AppDestinations.PROFILE -> UserProfileScreen(modifier = Modifier.padding(innerPadding))
             }
         }
-    }
-}
-
-@Composable
-fun ShopScreen(modifier: Modifier = Modifier) {
-    Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Text(text = "Page for Shop")
     }
 }
 
