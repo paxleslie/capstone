@@ -20,12 +20,13 @@ object PostRepository {
             .decodeList<Post>()
     }
 
-    suspend fun updatePost(postId: String, title: String?, body: String?, pointValue: Int?, dueAt: String?) {
+    suspend fun updatePost(postId: String, title: String?, body: String?, pointValue: Int?, dueAt: String?, color: String? = null) {
         client.postgrest["posts"].update({
             set("title", title)
             set("body", body)
             set("point_value", pointValue)
             set("due_at", dueAt)
+            if (color != null) set("color", color)
         }) { filter { eq("post_id", postId) } }
     }
 
