@@ -7,7 +7,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 object PostRepository {
-    private val client = SupabaseClient.client
+    private val client by lazy { SupabaseClient.client }
 
     suspend fun createPost(post: Post) {
         client.postgrest["posts"].insert(post)
