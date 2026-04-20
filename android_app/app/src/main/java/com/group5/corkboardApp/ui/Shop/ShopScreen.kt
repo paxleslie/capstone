@@ -33,7 +33,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -66,7 +65,6 @@ fun ShopScreen(modifier: Modifier = Modifier) {
     
     val snackbarHostState = remember { SnackbarHostState() }
 
-    // Refresh households whenever the screen is shown
     LaunchedEffect(Unit) {
         viewModel.loadHouseholds()
     }
@@ -85,16 +83,15 @@ fun ShopScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(snackbarHostState) },
-        containerColor = CorkboardBackground,
-        modifier = modifier.fillMaxSize()
-    ) { padding ->
-        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+    // Using Box instead of Scaffold to avoid double padding and ensure same height as Board
+    Box(modifier = modifier.fillMaxSize().background(CorkboardBackground)) {
+        Column(modifier = Modifier.fillMaxSize()) {
             if (households.isNotEmpty()) {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                    contentPadding = PaddingValues(
+                        horizontal = 16.dp, vertical = 8.dp
+                    )
                 ) {
                     items(households, key = { it.household_id }) { household ->
                         FilterChip(
@@ -104,7 +101,7 @@ fun ShopScreen(modifier: Modifier = Modifier) {
                             modifier = Modifier.handDrawnBorder(),
                             shape = RoundedCornerShape(0.dp),
                             colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = Color(0xFFD1C4E9), // Matching light purple
+                                selectedContainerColor = Color(0xFFD1C4E9),
                                 containerColor = Color.White
                             )
                         )
@@ -164,6 +161,11 @@ fun ShopScreen(modifier: Modifier = Modifier) {
                 }
             }
         }
+        
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier.align(Alignment.BottomCenter)
+        )
     }
 }
 
