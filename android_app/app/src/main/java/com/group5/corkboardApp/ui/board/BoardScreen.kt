@@ -664,7 +664,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
             text = { Text("Are you sure you want to delete \"${post.title ?: "this post"}\"?", color = Color.Black) },
             confirmButton = {
                 Button(
-                    onClick = { viewModel.deletePost(post.post_id!!) },
+                    onClick = { post.post_id?.let { viewModel.deletePost(it) } },
                     enabled = !actionLoading,
                     modifier = Modifier.handDrawnBorder(),
                     shape = RoundedCornerShape(0.dp),

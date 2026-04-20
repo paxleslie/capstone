@@ -204,8 +204,9 @@ class BoardViewModel : ViewModel() {
         viewModelScope.launch {
             _postActionState.value = PostActionState.Loading
             try {
+                val postId = post.post_id ?: return@launch
                 PostRepository.updatePost(
-                    postId = post.post_id!!,
+                    postId = postId,
                     title = title.ifBlank { null },
                     body = body.ifBlank { null },
                     pointValue = pointValue,
@@ -246,7 +247,8 @@ class BoardViewModel : ViewModel() {
                 val memberships = HouseholdRepository.getUserMemberships(userId)
                 val memberId = memberships.find { it.household_id == post.household_id }?.member_id
                     ?: throw Exception("Not a member of this household")
-                PostRepository.completeChore(post.post_id!!, memberId)
+                val postId = post.post_id ?: return@launch
+                PostRepository.completeChore(postId, memberId)
                 _postActionState.value = PostActionState.Success
                 refreshPosts()
             } catch (e: Exception) {

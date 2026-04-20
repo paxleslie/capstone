@@ -10,7 +10,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 object ShopRepository {
-    private val client = SupabaseClient.client
+    private val client by lazy { SupabaseClient.client }
     private const val TAG = "ShopRepository"
 
     suspend fun getShopItems(householdId: String): List<ShopItem> {
