@@ -57,6 +57,9 @@ class BoardViewModel : ViewModel() {
     private val _ownedColors = MutableStateFlow<List<ShopItem>>(emptyList())
     val ownedColors: StateFlow<List<ShopItem>> = _ownedColors
 
+    private val _defaultPostColor = MutableStateFlow<String?>(null)
+    val defaultPostColor: StateFlow<String?> = _defaultPostColor
+
     fun selectHousehold(householdId: String) {
         SessionManager.selectHousehold(householdId)
     }
@@ -173,7 +176,7 @@ class BoardViewModel : ViewModel() {
                         status = if (type == "chore") "pending" else null,
                         due_at = dueAt?.ifBlank { null },
                         household_id = householdId,
-                        color = color
+                        color = color ?: _defaultPostColor.value
                     )
                 )
                 _createPostState.value = CreatePostState.Success
@@ -187,6 +190,10 @@ class BoardViewModel : ViewModel() {
                 )
             }
         }
+    }
+
+    fun setDefaultPostColor(color: String?) {
+        _defaultPostColor.value = color
     }
 
     fun resetCreateState() {

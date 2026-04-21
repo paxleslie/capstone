@@ -30,16 +30,12 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -124,11 +120,9 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     var pointValue by remember { mutableStateOf("") }
     var dueAt by remember { mutableStateOf("") }
     var selectedColor by remember { mutableStateOf<String?>(null) }
-    var householdDropdownExpanded by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
 
     val households = (householdLoadState as? BoardViewModel.HouseholdLoadState.Success)?.households ?: emptyList()
-    val selectedHousehold = households.find { it.household_id == selectedHouseholdId }
 
     LaunchedEffect(createPostState) {
         when (val state = createPostState) {
@@ -178,7 +172,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
         if (title.isBlank()) {
             errorText = "Please enter a title"
         } else if (hid == null) {
-            errorText = "Please select a household"
+            errorText = "Please select a household first"
         } else {
             val formattedDate = if (dueAt.length == 8) {
                 "${dueAt.substring(4, 8)}-${dueAt.substring(0, 2)}-${dueAt.substring(2, 4)}"
@@ -419,40 +413,6 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                                         Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.Black))
                                     }
                                 }
-                            }
-                        }
-                    }
-
-                    ExposedDropdownMenuBox(
-                        expanded = householdDropdownExpanded,
-                        onExpandedChange = { if (!isLoading) householdDropdownExpanded = it }
-                    ) {
-                        OutlinedTextField(
-                            value = selectedHousehold?.household_name ?: "Select household",
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Household") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(householdDropdownExpanded) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                                .handDrawnBorder(),
-                            shape = RoundedCornerShape(0.dp),
-                            enabled = !isLoading,
-                            colors = blackTextFieldColors
-                        )
-                        ExposedDropdownMenu(
-                            expanded = householdDropdownExpanded,
-                            onDismissRequest = { householdDropdownExpanded = false }
-                        ) {
-                            households.forEach { household ->
-                                DropdownMenuItem(
-                                    text = { Text(household.household_name, color = Color.Black) },
-                                    onClick = {
-                                        viewModel.selectHousehold(household.household_id)
-                                        householdDropdownExpanded = false
-                                    }
-                                )
                             }
                         }
                     }
