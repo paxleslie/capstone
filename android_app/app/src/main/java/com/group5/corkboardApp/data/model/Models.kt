@@ -73,5 +73,7 @@ data class MemberReward(
     val id: String? = null,
     val member_id: String,
     val reward_id: String,
-    val note: String? = null
+    val note: String? = null,
+    @SerialName("rewards")
+    val reward: ShopItem? = null
 )

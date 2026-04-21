@@ -23,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.AlertDialog
@@ -106,12 +107,14 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     val postActionState by viewModel.postActionState.collectAsState()
     val selectedHouseholdId by viewModel.selectedHouseholdId.collectAsState()
     val ownedColors by viewModel.ownedColors.collectAsState()
+    val defaultPostColor by viewModel.defaultPostColor.collectAsState()
 
     LaunchedEffect(Unit) { viewModel.loadHouseholds() }
 
     val focusManager = LocalFocusManager.current
 
     var showCreateDialog by remember { mutableStateOf(false) }
+    var showColorDialog by remember { mutableStateOf(false) }
     var postToEdit by remember { mutableStateOf<Post?>(null) }
     var postToDelete by remember { mutableStateOf<Post?>(null) }
     var title by remember { mutableStateOf("") }
@@ -119,7 +122,6 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     var selectedType by remember { mutableStateOf("note") }
     var pointValue by remember { mutableStateOf("") }
     var dueAt by remember { mutableStateOf("") }
-    var selectedColor by remember { mutableStateOf<String?>(null) }
     var errorText by remember { mutableStateOf<String?>(null) }
 
     val households = (householdLoadState as? BoardViewModel.HouseholdLoadState.Success)?.households ?: emptyList()
@@ -133,7 +135,6 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                 selectedType = "note"
                 pointValue = ""
                 dueAt = ""
-                selectedColor = null
                 errorText = null
                 viewModel.resetCreateState()
             }
@@ -162,7 +163,6 @@ fun BoardScreen(modifier: Modifier = Modifier) {
         selectedType = "note"
         pointValue = ""
         dueAt = ""
-        selectedColor = null
         errorText = null
         viewModel.resetCreateState()
     }
@@ -185,7 +185,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                 householdId = hid,
                 pointValue = pointValue.toIntOrNull(),
                 dueAt = formattedDate,
-                color = selectedColor
+                color = null // Will use defaultPostColor from ViewModel
             )
         }
     }
@@ -206,26 +206,44 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     )
 
     Column(modifier = modifier.fillMaxSize()) {
-        if (households.isNotEmpty()) {
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    horizontal = 16.dp, vertical = 8.dp
-                )
-            ) {
-                items(households, key = { it.household_id }) { household ->
-                    FilterChip(
-                        selected = household.household_id == selectedHouseholdId,
-                        onClick = { viewModel.selectHousehold(household.household_id) },
-                        label = { Text(household.household_name, color = Color.Black) },
-                        modifier = Modifier.handDrawnBorder(),
-                        shape = RoundedCornerShape(0.dp),
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Color(0xFFD1C4E9), // Matching light purple
-                            containerColor = Color.White
-                        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            if (households.isNotEmpty()) {
+                LazyRow(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 16.dp, vertical = 8.dp
                     )
+                ) {
+                    items(households, key = { it.household_id }) { household ->
+                        FilterChip(
+                            selected = household.household_id == selectedHouseholdId,
+                            onClick = { viewModel.selectHousehold(household.household_id) },
+                            label = { Text(household.household_name, color = Color.Black) },
+                            modifier = Modifier.handDrawnBorder(),
+                            shape = RoundedCornerShape(0.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFFD1C4E9), // Matching light purple
+                                containerColor = Color.White
+                            )
+                        )
+                    }
                 }
+            }
+            
+            IconButton(
+                onClick = { showColorDialog = true },
+                modifier = Modifier.padding(4.dp).handDrawnBorder(),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = "Default Post Color",
+                    tint = Color.Black
+                )
             }
         }
 
@@ -287,6 +305,62 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                 Icon(Icons.Default.Add, contentDescription = "Create post")
             }
         }
+    }
+
+    if (showColorDialog) {
+        AlertDialog(
+            onDismissRequest = { showColorDialog = false },
+            title = { Text("Default Post Color", color = Color.Black) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Text("Select the default color for your new posts in this household:", color = Color.Black)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(PostItCyan)
+                                    .clickable { 
+                                        viewModel.setDefaultPostColor(null)
+                                        showColorDialog = false
+                                    }
+                                    .handDrawnBorder(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (defaultPostColor == null) {
+                                    Box(modifier = Modifier.size(16.dp).clip(CircleShape).background(Color.Black))
+                                }
+                            }
+                        }
+                        items(ownedColors) { colorItem ->
+                            val color = try { Color(android.graphics.Color.parseColor(colorItem.value)) } catch (e: Exception) { Color.Gray }
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .clickable { 
+                                        viewModel.setDefaultPostColor(colorItem.value)
+                                        showColorDialog = false
+                                    }
+                                    .handDrawnBorder(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (defaultPostColor == colorItem.value) {
+                                    Box(modifier = Modifier.size(16.dp).clip(CircleShape).background(Color.Black))
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showColorDialog = false }) {
+                    Text("Close", color = Color.Black)
+                }
+            }
+        )
     }
 
     if (showCreateDialog) {
@@ -382,43 +456,6 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                         )
                     }
 
-                    if (ownedColors.isNotEmpty()) {
-                        Text("Post Color", style = MaterialTheme.typography.labelMedium, color = Color.Black)
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .background(PostItCyan)
-                                        .clickable { selectedColor = null }
-                                        .handDrawnBorder(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (selectedColor == null) {
-                                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.Black))
-                                    }
-                                }
-                            }
-                            items(ownedColors) { colorItem ->
-                                val color = try { Color(android.graphics.Color.parseColor(colorItem.value)) } catch (e: Exception) { Color.Gray }
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .background(color)
-                                        .clickable { selectedColor = colorItem.value }
-                                        .handDrawnBorder(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (selectedColor == colorItem.value) {
-                                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.Black))
-                                    }
-                                }
-                            }
-                        }
-                    }
-
                     errorText?.let {
                         Text(text = it, color = Color.Red)
                     }
@@ -457,7 +494,6 @@ fun BoardScreen(modifier: Modifier = Modifier) {
         var editBody by remember(post.post_id) { mutableStateOf(post.body ?: "") }
         var editPointValue by remember(post.post_id) { mutableStateOf(post.point_value?.toString() ?: "") }
         var editDueAt by remember(post.post_id) { mutableStateOf(post.due_at?.filter { it.isDigit() } ?: "") }
-        var editColor by remember(post.post_id) { mutableStateOf(post.color) }
         var editError by remember(post.post_id) { mutableStateOf<String?>(null) }
 
         fun handleUpdatePost() {
@@ -474,7 +510,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                     body = editBody.trim(),
                     pointValue = editPointValue.toIntOrNull(),
                     dueAt = formattedDate,
-                    color = editColor
+                    color = post.color // Keep original color when editing
                 )
             }
         }
@@ -548,43 +584,6 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                             enabled = !actionLoading,
                             colors = blackTextFieldColors
                         )
-                    }
-
-                    if (ownedColors.isNotEmpty()) {
-                        Text("Post Color", style = MaterialTheme.typography.labelMedium, color = Color.Black)
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .background(PostItCyan)
-                                        .clickable { editColor = null }
-                                        .handDrawnBorder(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (editColor == null) {
-                                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.Black))
-                                    }
-                                }
-                            }
-                            items(ownedColors) { colorItem ->
-                                val color = try { Color(android.graphics.Color.parseColor(colorItem.value)) } catch (e: Exception) { Color.Gray }
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .background(color)
-                                        .clickable { editColor = colorItem.value }
-                                        .handDrawnBorder(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (editColor == colorItem.value) {
-                                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.Black))
-                                    }
-                                }
-                            }
-                        }
                     }
 
                     editError?.let { Text(text = it, color = Color.Red) }

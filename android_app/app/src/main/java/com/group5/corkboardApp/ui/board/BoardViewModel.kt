@@ -1,5 +1,6 @@
 package com.group5.corkboardApp.ui.board
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.group5.corkboardApp.data.model.Household
@@ -60,6 +61,23 @@ class BoardViewModel : ViewModel() {
     private val _defaultPostColor = MutableStateFlow<String?>(null)
     val defaultPostColor: StateFlow<String?> = _defaultPostColor
 
+    private val universalItems = listOf(
+        ShopItem(
+            id = "d82b1b39-3946-43e1-8fa0-2d5e938dc009",
+            name = "Red Note",
+            price = 50,
+            type = "color",
+            value = "#FF5252"
+        ),
+        ShopItem(
+            id = "green_note_placeholder", 
+            name = "Green Note",
+            price = 50,
+            type = "color",
+            value = "#AED581"
+        )
+    )
+
     fun selectHousehold(householdId: String) {
         SessionManager.selectHousehold(householdId)
     }
@@ -95,11 +113,29 @@ class BoardViewModel : ViewModel() {
                 val memberships = HouseholdRepository.getUserMemberships(userId)
                 val member = memberships.find { it.household_id == householdId }
                 if (member?.member_id != null) {
-                    val ownedItemIds = ShopRepository.getOwnedItems(member.member_id, householdId)
-                    val allItems = ShopRepository.getShopItems(householdId)
-                    _ownedColors.value = allItems.filter { it.id in ownedItemIds && it.type == "color" }
+                    // Fetch using the same two-step approach as ShopViewModel to avoid join permission issues
+                    val ownedRewardIds = ShopRepository.getOwnedItems(member.member_id, householdId)
+                    val dbItems = ShopRepository.getShopItems(householdId)
+                    
+                    val allPossibleItems = dbItems + universalItems
+                    val ownedNames = allPossibleItems.filter { it.id in ownedRewardIds }.map { it.name }.toSet()
+
+                    _ownedColors.value = allPossibleItems
+                        .filter { it.type == "color" }
+                        .filter { item ->
+                            item.id in ownedRewardIds || item.name in ownedNames
+                        }
+                        .distinctBy { it.name }
+                        .map { item ->
+                            // Ensure the 'value' column (hex code) is properly used
+                            if (item.value.startsWith("#") || item.value.length < 3) item 
+                            else item.copy(value = "#${item.value}")
+                        }
+                    
+                    Log.d("BoardViewModel", "Loaded ${_ownedColors.value.size} owned colors using two-step fetch")
                 }
             } catch (e: Exception) {
+                Log.e("BoardViewModel", "Error loading owned colors", e)
                 _ownedColors.value = emptyList()
             }
         }
@@ -217,7 +253,7 @@ class BoardViewModel : ViewModel() {
                     title = title.ifBlank { null },
                     body = body.ifBlank { null },
                     pointValue = pointValue,
-                    dueAt = dueAt?.ifBlank { null },
+                    dueAt = dueAt,
                     color = color
                 )
                 _postActionState.value = PostActionState.Success
