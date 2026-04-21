@@ -114,4 +114,24 @@ object HouseholdRepository {
             DeleteHouseholdParams(householdId = householdId)
         )
     }
+
+    /**
+     * Updates member points. 
+     * Uses .select() to verify the update actually happened (catches RLS failures).
+     */
+    suspend fun updateMemberPoints(memberId: String, totalPoints: Int) {
+        Log.d(TAG, "Updating total_points for memberId: $memberId to $totalPoints")
+        val response = client.postgrest["household_members"].update(
+            {
+                set("total_points", totalPoints)
+            }
+        ) {
+            filter { eq("member_id", memberId) }
+            select() // Request data back to verify the update worked
+        }.decodeSingleOrNull<HouseholdMember>()
+
+        if (response == null) {
+            throw Exception("Update failed. You may not have permission (check RLS policies).")
+        }
+    }
 }

@@ -99,6 +99,16 @@ class HouseholdViewModel : ViewModel() {
     private val _navState = MutableStateFlow<NavState>(NavState.Idle)
     val navState: StateFlow<NavState> = _navState
 
+    // Points editing state (MVVM pattern)
+    private val _showEditPointsDialog = MutableStateFlow(false)
+    val showEditPointsDialog: StateFlow<Boolean> = _showEditPointsDialog
+
+    private val _editPointsMember = MutableStateFlow<HouseholdMember?>(null)
+    val editPointsMember: StateFlow<HouseholdMember?> = _editPointsMember
+
+    private val _editPointsValue = MutableStateFlow("")
+    val editPointsValue: StateFlow<String> = _editPointsValue
+
     val currentUserMember: StateFlow<HouseholdMember?> = _detailState.map { state ->
         if (state is HouseholdDetailState.Success) {
             val currentUserId = AuthRepository.currentUser()?.id
@@ -164,21 +174,27 @@ class HouseholdViewModel : ViewModel() {
         }
     }
 
-    fun getHouseholdDetails(householdId: String) {
+    fun getHouseholdDetails(householdId: String, showLoading: Boolean = true) {
         viewModelScope.launch {
-            _detailState.value = HouseholdDetailState.Loading
+            if (showLoading) {
+                _detailState.value = HouseholdDetailState.Loading
+            }
             try {
                 val household = HouseholdRepository.getHouseholdDetails(householdId)
 
                 if (household != null) {
                     val members = HouseholdRepository.getMembers(householdId)
                     _detailState.value = HouseholdDetailState.Success(household, members)
-                    _navState.value = NavState.Detail
-                } else {
+                    if (showLoading) {
+                        _navState.value = NavState.Detail
+                    }
+                } else if (showLoading) {
                     _detailState.value = HouseholdDetailState.Error("Household not found")
                 }
             } catch (e: Exception) {
-                _detailState.value = HouseholdDetailState.Error(e.localizedMessage ?: "Failed to fetch details")
+                if (showLoading) {
+                    _detailState.value = HouseholdDetailState.Error(e.localizedMessage ?: "Failed to fetch details")
+                }
             }
         }
     }
@@ -268,6 +284,78 @@ class HouseholdViewModel : ViewModel() {
                 Log.e(TAG, "Failed to delete household", e)
                 _actionState.value = HouseholdActionState.Error(
                     e.localizedMessage ?: "Failed to delete household"
+                )
+            }
+        }
+    }
+
+    fun startEditingPoints(member: HouseholdMember) {
+        _editPointsMember.value = member
+        _editPointsValue.value = (member.total_points ?: 0).toString()
+        _showEditPointsDialog.value = true
+    }
+
+    fun onEditPointsValueChange(newValue: String) {
+        if (newValue.isEmpty() || newValue.all { it.isDigit() }) {
+            _editPointsValue.value = newValue
+        }
+    }
+
+    fun cancelEditingPoints() {
+        _showEditPointsDialog.value = false
+        _editPointsMember.value = null
+        _editPointsValue.value = ""
+        resetActionState()
+    }
+
+    fun saveMemberPoints(householdId: String) {
+        val member = _editPointsMember.value ?: return
+        val points = _editPointsValue.value.toIntOrNull() ?: 0
+        
+        viewModelScope.launch {
+            _actionState.value = HouseholdActionState.Loading
+            try {
+                Log.d(TAG, "Attempting to update points for member ${member.member_id} to $points")
+                HouseholdRepository.updateMemberPoints(member.member_id, points)
+                
+                // 1. Manually update local state for immediate feedback
+                val currentState = _detailState.value
+                if (currentState is HouseholdDetailState.Success) {
+                    val updatedMembers = currentState.members.map {
+                        if (it.member_id == member.member_id) it.copy(total_points = points) else it
+                    }
+                    _detailState.value = currentState.copy(members = updatedMembers)
+                }
+
+                // 2. Clear dialog state
+                _showEditPointsDialog.value = false
+                _editPointsMember.value = null
+                _editPointsValue.value = ""
+                _actionState.value = HouseholdActionState.Success("Points updated successfully")
+                
+                // 3. Re-fetch from DB in background (no loading spinner) to sync final state
+                getHouseholdDetails(householdId, showLoading = false)
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to update member points", e)
+                _actionState.value = HouseholdActionState.Error(
+                    e.localizedMessage ?: "Failed to update points. Please try again."
+                )
+            }
+        }
+    }
+
+    fun updateMemberPoints(householdId: String, memberId: String, totalPoints: Int) {
+        viewModelScope.launch {
+            _actionState.value = HouseholdActionState.Loading
+            try {
+                HouseholdRepository.updateMemberPoints(memberId, totalPoints)
+                _actionState.value = HouseholdActionState.Success("Points updated successfully")
+                getHouseholdDetails(householdId)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to update member points", e)
+                _actionState.value = HouseholdActionState.Error(
+                    e.localizedMessage ?: "Failed to update member points"
                 )
             }
         }

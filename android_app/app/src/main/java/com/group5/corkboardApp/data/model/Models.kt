@@ -32,7 +32,6 @@ data class HouseholdMember(
     val profile: Profile? = null
 )
 
-// Represents a row from the public users table
 @Serializable
 data class UserProfile(
     val name: String = "",
@@ -53,5 +52,26 @@ data class Post(
     val status: String? = null,
     val created_at: String? = null,
     val due_at: String? = null,
-    val household_id: String
+    val household_id: String,
+    val color: String? = null // Hex color or named color from shop
+)
+
+@Serializable
+data class ShopItem(
+    @SerialName("reward_id")
+    val id: String,
+    @SerialName("title")
+    val name: String,
+    @SerialName("cost")
+    val price: Int,
+    val type: String = "icon", // "icon" or "color"
+    val value: String = "star" // "star", "smiley", or hex color string
+)
+
+@Serializable
+data class MemberReward(
+    val id: String? = null,
+    val member_id: String,
+    val reward_id: String,
+    val note: String? = null
 )

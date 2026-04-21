@@ -1,22 +1,27 @@
 package com.group5.corkboardApp.ui.userProfile
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -39,6 +44,9 @@ import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.group5.corkboardApp.ui.household.HouseholdViewModel
+import com.group5.corkboardApp.ui.theme.CorkboardBackground
+import com.group5.corkboardApp.ui.theme.PostItMagenta
+import com.group5.corkboardApp.ui.theme.handDrawnBorder
 
 @Composable
 fun UserProfileScreen(modifier: Modifier = Modifier) {
@@ -64,6 +72,11 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
     
     var showRenameDialog by remember { mutableStateOf(false) }
     var renamedHouseholdName by remember { mutableStateOf("") }
+
+    // MVVM Point editing state
+    val showEditPointsDialog by householdViewModel.showEditPointsDialog.collectAsState()
+    val editPointsMember by householdViewModel.editPointsMember.collectAsState()
+    val editPointsValue by householdViewModel.editPointsValue.collectAsState()
     
     val focusManager = LocalFocusManager.current
 
@@ -94,9 +107,11 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
     }
     
     LaunchedEffect(actionState) {
-        if (actionState is HouseholdViewModel.HouseholdActionState.Success && showRenameDialog) {
-            showRenameDialog = false
-            renamedHouseholdName = ""
+        if (actionState is HouseholdViewModel.HouseholdActionState.Success) {
+            if (showRenameDialog) {
+                showRenameDialog = false
+                renamedHouseholdName = ""
+            }
         }
     }
 
@@ -106,6 +121,7 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
         Column(
             modifier = modifier
                 .fillMaxSize()
+                .background(CorkboardBackground)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -116,11 +132,16 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
 
                     when (val pState = profileUiState) {
                         is UserProfileViewModel.ProfileState.Loading -> {
-                            CircularProgressIndicator()
+                            CircularProgressIndicator(color = Color.Black)
                         }
                         is UserProfileViewModel.ProfileState.Error -> {
                             Text(text = pState.message, color = Color.Red)
-                            Button (onClick = { profileViewModel.getUserInfo() }) {
+                            Button (
+                                onClick = { profileViewModel.getUserInfo() },
+                                modifier = Modifier.handDrawnBorder(),
+                                shape = RoundedCornerShape(0.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                            ) {
                                 Text("Retry")
                             }
                         }
@@ -129,12 +150,22 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                             Text(text = pState.email, style = MaterialTheme.typography.bodyMedium)
 
                             Spacer(modifier = Modifier.height(24.dp))
-                            Button(onClick = { householdViewModel.navToListHouseholds() }) {
+                            Button(
+                                onClick = { householdViewModel.navToListHouseholds() },
+                                modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                                shape = RoundedCornerShape(0.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                            ) {
                                 Text("Manage Households")
                             }
                             
                             Spacer(modifier = Modifier.height(8.dp))
-                            Button(onClick = { isEditingAccount = true }) {
+                            Button(
+                                onClick = { isEditingAccount = true },
+                                modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                                shape = RoundedCornerShape(0.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                            ) {
                                 Text("Account Settings")
                             }
                         }
@@ -146,18 +177,33 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                     Text(text = "Your Households", style = MaterialTheme.typography.headlineMedium)
                     Spacer(modifier = Modifier.height(16.dp))
 
+                    // Highlighted "Create New Household" Button
                     Button(
                         onClick = { showCreateDialog = true },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .handDrawnBorder(),
+                        shape = RoundedCornerShape(0.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = PostItMagenta,
+                            contentColor = Color.White
+                        ),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
                     ) {
-                        Text("Create New Household")
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            "Create New Household",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
 
                     when (val hState = householdListState) {
                         is HouseholdViewModel.HouseholdListState.Loading -> {
-                            CircularProgressIndicator()
+                            CircularProgressIndicator(color = Color.Black)
                         }
                         is HouseholdViewModel.HouseholdListState.Error -> {
                             Text(text = hState.message, color = Color.Red)
@@ -166,21 +212,21 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                             if (hState.isEmpty) {
                                 Text("You are not in any households.")
                             } else {
-                                LazyColumn {
+                                LazyColumn(modifier = Modifier.weight(1f)) {
                                     items(
                                         items = hState.households,
                                         key = { it.household_id }
                                     ) { household ->
-                                        Card(
+                                        Button(
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(vertical = 4.dp),
+                                                .padding(vertical = 4.dp)
+                                                .handDrawnBorder(),
+                                            shape = RoundedCornerShape(0.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black),
                                             onClick = { householdViewModel.getHouseholdDetails(household.household_id) }
                                         ) {
-                                            Text(
-                                                text = household.household_name,
-                                                modifier = Modifier.padding(16.dp)
-                                            )
+                                            Text(text = household.household_name)
                                         }
                                     }
                                 }
@@ -189,12 +235,19 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                         else -> {}
                     }
                     Spacer(modifier = Modifier.height(16.dp))
-                    TextButton(onClick = { householdViewModel.navToIdle() }) { Text("Back to Profile") }
+                    Button(
+                        onClick = { householdViewModel.navToIdle() },
+                        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                        shape = RoundedCornerShape(0.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                    ) { 
+                        Text("Back to Profile") 
+                    }
                 }
                 is HouseholdViewModel.NavState.Detail -> {
                     when (val dState = householdDetailState) {
                         is HouseholdViewModel.HouseholdDetailState.Loading -> {
-                            CircularProgressIndicator()
+                            CircularProgressIndicator(color = Color.Black)
                         }
                         is HouseholdViewModel.HouseholdDetailState.Success -> {
                             val isAdmin = currentMemberState?.role?.equals("admin", ignoreCase = true) == true
@@ -203,36 +256,26 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                             Column(modifier = Modifier.fillMaxSize()) {
                                 Text(
                                     text = dState.household.household_name, 
-                                    style = MaterialTheme.typography.headlineMedium,
-                                    textDecoration = if (isAdmin) TextDecoration.Underline else TextDecoration.None,
+                                    style = MaterialTheme.typography.displayLarge,
+                                    textDecoration = TextDecoration.Underline,
                                     fontWeight = FontWeight.Bold,
                                     modifier = if (isAdmin) Modifier.clickable {
                                         renamedHouseholdName = dState.household.household_name
                                         showRenameDialog = true
                                     } else Modifier
                                 )
-                                Text(text = "Your Role: ${currentMemberState?.role}", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
-                                Spacer(modifier = Modifier.height(8.dp))
-
-                                when (val aState = actionState) {
-                                    is HouseholdViewModel.HouseholdActionState.Error -> {
-                                        Text(text = aState.message, color = Color.Red, modifier = Modifier.padding(vertical = 8.dp))
-                                    }
-                                    is HouseholdViewModel.HouseholdActionState.Success -> {
-                                        Text(text = aState.message, color = Color.Gray, modifier = Modifier.padding(vertical = 8.dp))
-                                    }
-                                    else -> {}
-                                }
+                                Text(text = "Your Role: ${currentMemberState?.role}", style = MaterialTheme.typography.bodyMedium, color = Color.DarkGray)
+                                Spacer(modifier = Modifier.height(16.dp))
 
                                 if (isAdmin) {
-                                    Spacer(modifier = Modifier.height(16.dp))
                                     OutlinedTextField(
                                         value = emailToAdd,
                                         onValueChange = { if (it.length <= 50) emailToAdd = it },
                                         label = { Text("Add member by email") },
-                                        modifier = Modifier.fillMaxWidth(),
+                                        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
                                         enabled = addMemberState !is HouseholdViewModel.MemberAddState.Loading,
                                         singleLine = true,
+                                        shape = RoundedCornerShape(0.dp),
                                         keyboardOptions = KeyboardOptions(
                                             keyboardType = KeyboardType.Email,
                                             imeAction = ImeAction.Done
@@ -246,6 +289,7 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                                             }
                                         )
                                     )
+                                    Spacer(modifier = Modifier.height(8.dp))
                                     Button(
                                         onClick = {
                                             if (emailToAdd.isNotBlank()) {
@@ -253,15 +297,18 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                                                 householdViewModel.addMemberByEmail(dState.household, emailToAdd.trim())
                                             }
                                         },
-                                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                                        shape = RoundedCornerShape(0.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.LightGray.copy(alpha = 0.5f), contentColor = Color.Black),
                                         enabled = addMemberState !is HouseholdViewModel.MemberAddState.Loading && emailToAdd.isNotBlank()
                                     ) {
                                         if (addMemberState is HouseholdViewModel.MemberAddState.Loading) {
-                                            CircularProgressIndicator(color = Color.White)
+                                            CircularProgressIndicator(color = Color.Black)
                                         } else {
                                             Text("Add Member")
                                         }
                                     }
+                                    Spacer(modifier = Modifier.height(16.dp))
                                 }
 
                                 LazyColumn(modifier = Modifier.weight(1f)) {
@@ -272,32 +319,53 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                                         Column(modifier = Modifier.padding(vertical = 8.dp)) {
                                             val profile = member.profile
                                             val nameToShow = member.nickname?.takeIf { it.isNotBlank() }
-                                ?: profile?.display_name
-                                ?: profile?.name
-                                ?: "User (${member.user_id.take(8)}...)"
+                                                ?: profile?.display_name
+                                                ?: profile?.name
+                                                ?: "User (${member.user_id.take(8)}...)"
 
-                                            Text(text = nameToShow, style = MaterialTheme.typography.bodyLarge)
+                                            Text(
+                                                text = "$nameToShow (${member.total_points ?: 0} pts)",
+                                                style = MaterialTheme.typography.titleLarge,
+                                                fontWeight = FontWeight.Bold
+                                            )
                                             Text(text = "Role: ${member.role}", style = MaterialTheme.typography.bodySmall)
 
-                                            // FIX: Pass member.member_id instead of user_id to match DB logic
-                                            if (isAdmin && member.user_id != currentUserId) {
-                                                Button(
-                                                    onClick = { householdViewModel.removeMember(dState.household, member.member_id) },
-                                                    modifier = Modifier.padding(top = 4.dp),
-                                                    colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
-                                                ) {
-                                                    Text("Remove User")
+                                            if (isAdmin) {
+                                                Spacer(modifier = Modifier.height(4.dp))
+                                                Row(modifier = Modifier.fillMaxWidth()) {
+                                                    Button(
+                                                        onClick = { householdViewModel.startEditingPoints(member) },
+                                                        modifier = Modifier.weight(1f).handDrawnBorder(),
+                                                        shape = RoundedCornerShape(0.dp),
+                                                        colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                                                    ) {
+                                                        Text("Edit Points", style = MaterialTheme.typography.labelSmall)
+                                                    }
+                                                    
+                                                    if (member.user_id != currentUserId) {
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Button(
+                                                            onClick = { householdViewModel.removeMember(dState.household, member.member_id) },
+                                                            modifier = Modifier.weight(1f).handDrawnBorder(),
+                                                            shape = RoundedCornerShape(0.dp),
+                                                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red, contentColor = Color.White)
+                                                        ) {
+                                                            Text("Remove User", style = MaterialTheme.typography.labelSmall)
+                                                        }
+                                                    }
                                                 }
                                             }
-                                            HorizontalDivider()
                                         }
                                     }
                                 }
 
-                                // Layout Fix: Reordered buttons and changed styles
+                                Spacer(modifier = Modifier.height(16.dp))
+
                                 Button(
                                     onClick = { householdViewModel.navToListHouseholds() },
-                                    modifier = Modifier.fillMaxWidth()
+                                    modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                                    shape = RoundedCornerShape(0.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
                                 ) {
                                     Text("Back to Households")
                                 }
@@ -307,22 +375,18 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                                 if (isAdmin) {
                                     Button(
                                         onClick = { householdViewModel.deleteHousehold(dState.household) },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = Color.Red,
-                                            contentColor = Color.White
-                                        )
+                                        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                                        shape = RoundedCornerShape(0.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red, contentColor = Color.White)
                                     ) {
                                         Text("Delete Household")
                                     }
                                 } else {
                                     Button(
                                         onClick = { householdViewModel.leaveHousehold(dState.household, currentMemberState?.member_id ?: "") },
-                                        modifier = Modifier.fillMaxWidth(),
-                                        colors = ButtonDefaults.buttonColors(
-                                            containerColor = Color.Red,
-                                            contentColor = Color.White
-                                        )
+                                        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                                        shape = RoundedCornerShape(0.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color.Red, contentColor = Color.White)
                                     ) {
                                         Text("Leave Household")
                                     }
@@ -336,6 +400,7 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
         }
     }
 
+    // Dialogs remain the same as they use handDrawnBorder already
     if (showCreateDialog) {
         AlertDialog(
             onDismissRequest = {
@@ -354,17 +419,9 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                         onValueChange = { if (it.length <= 50) newHouseholdName = it },
                         label = { Text("Household Name") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = createState !is HouseholdViewModel.HouseholdCreateState.Loading,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                if (newHouseholdName.isNotBlank()) {
-                                    focusManager.clearFocus()
-                                    householdViewModel.createHousehold(newHouseholdName.trim())
-                                }
-                            }
-                        )
+                        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                        shape = RoundedCornerShape(0.dp),
+                        enabled = createState !is HouseholdViewModel.HouseholdCreateState.Loading
                     )
                     createErrorText?.let {
                         Text(text = it, color = Color.Red)
@@ -381,24 +438,29 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                             householdViewModel.createHousehold(newHouseholdName.trim())
                         }
                     },
-                    enabled = createState !is HouseholdViewModel.HouseholdCreateState.Loading
+                    modifier = Modifier.handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp),
+                    enabled = createState !is HouseholdViewModel.HouseholdCreateState.Loading,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
                 ) {
                     if (createState is HouseholdViewModel.HouseholdCreateState.Loading) {
-                        CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
+                        CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp), color = Color.Black)
                     } else {
                         Text("Create")
                     }
                 }
             },
             dismissButton = {
-                TextButton(
+                Button(
                     onClick = {
                         showCreateDialog = false
                         newHouseholdName = ""
                         createErrorText = null
                         householdViewModel.resetCreateState()
                     },
-                    enabled = createState !is HouseholdViewModel.HouseholdCreateState.Loading
+                    modifier = Modifier.handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
                 ) {
                     Text("Cancel")
                 }
@@ -422,17 +484,9 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                         onValueChange = { if (it.length <= 50) renamedHouseholdName = it },
                         label = { Text("New Household Name") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = actionState !is HouseholdViewModel.HouseholdActionState.Loading,
-                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                        keyboardActions = KeyboardActions(
-                            onDone = {
-                                if (renamedHouseholdName.isNotBlank() && dState != null) {
-                                    focusManager.clearFocus()
-                                    householdViewModel.updateHouseholdName(dState.household, renamedHouseholdName.trim())
-                                }
-                            }
-                        )
+                        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                        shape = RoundedCornerShape(0.dp),
+                        enabled = actionState !is HouseholdViewModel.HouseholdActionState.Loading
                     )
                     if (actionState is HouseholdViewModel.HouseholdActionState.Error) {
                         Text(text = (actionState as HouseholdViewModel.HouseholdActionState.Error).message, color = Color.Red)
@@ -447,19 +501,92 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
                             householdViewModel.updateHouseholdName(dState.household, renamedHouseholdName.trim())
                         }
                     },
-                    enabled = actionState !is HouseholdViewModel.HouseholdActionState.Loading && renamedHouseholdName.isNotBlank()
+                    modifier = Modifier.handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp),
+                    enabled = actionState !is HouseholdViewModel.HouseholdActionState.Loading && renamedHouseholdName.isNotBlank(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
                 ) {
                     if (actionState is HouseholdViewModel.HouseholdActionState.Loading) {
-                        CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
+                        CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp), color = Color.Black)
                     } else {
                         Text("Update")
                     }
                 }
             },
             dismissButton = {
-                TextButton(
+                Button(
                     onClick = { showRenameDialog = false },
-                    enabled = actionState !is HouseholdViewModel.HouseholdActionState.Loading
+                    enabled = actionState !is HouseholdViewModel.HouseholdActionState.Loading,
+                    modifier = Modifier.handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showEditPointsDialog && editPointsMember != null) {
+        val dState = householdDetailState as? HouseholdViewModel.HouseholdDetailState.Success
+        AlertDialog(
+            onDismissRequest = {
+                if (actionState !is HouseholdViewModel.HouseholdActionState.Loading) {
+                    householdViewModel.cancelEditingPoints()
+                }
+            },
+            title = { Text("Edit Points for ${editPointsMember?.nickname ?: editPointsMember?.profile?.display_name ?: "Member"}") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = editPointsValue,
+                        onValueChange = { householdViewModel.onEditPointsValueChange(it) },
+                        label = { Text("Points") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                        shape = RoundedCornerShape(0.dp),
+                        enabled = actionState !is HouseholdViewModel.HouseholdActionState.Loading,
+                        keyboardActions = KeyboardActions(
+                            onDone = {
+                                if (dState != null) {
+                                    focusManager.clearFocus()
+                                    householdViewModel.saveMemberPoints(dState.household.household_id)
+                                }
+                            }
+                        )
+                    )
+                    if (actionState is HouseholdViewModel.HouseholdActionState.Error) {
+                        Text(text = (actionState as HouseholdViewModel.HouseholdActionState.Error).message, color = Color.Red)
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (dState != null) {
+                            focusManager.clearFocus()
+                            householdViewModel.saveMemberPoints(dState.household.household_id)
+                        }
+                    },
+                    enabled = actionState !is HouseholdViewModel.HouseholdActionState.Loading,
+                    modifier = Modifier.handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                ) {
+                    if (actionState is HouseholdViewModel.HouseholdActionState.Loading) {
+                        CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp), color = Color.Black)
+                    } else {
+                        Text("Save")
+                    }
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { householdViewModel.cancelEditingPoints() },
+                    enabled = actionState !is HouseholdViewModel.HouseholdActionState.Loading,
+                    modifier = Modifier.handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
                 ) {
                     Text("Cancel")
                 }

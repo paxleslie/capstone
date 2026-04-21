@@ -1,5 +1,7 @@
 package com.group5.corkboardApp.ui.board
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,9 +11,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -29,11 +35,13 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,12 +53,52 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.OffsetMapping
+import androidx.compose.ui.text.input.TransformedText
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.group5.corkboardApp.data.model.Post
+import com.group5.corkboardApp.ui.theme.PostItCyan
+import com.group5.corkboardApp.ui.theme.handDrawnBorder
+
+class DateVisualTransformation : VisualTransformation {
+    override fun filter(text: AnnotatedString): TransformedText {
+        val digits = text.text.filter { it.isDigit() }
+        val out = StringBuilder()
+
+        for (i in digits.indices) {
+            out.append(digits[i])
+            if (i == 1 || i == 3) out.append("/")
+        }
+
+        val formattedText = out.toString().take(10)
+
+        val offsetMapping = object : OffsetMapping {
+            override fun originalToTransformed(offset: Int): Int {
+                if (offset <= 1) return offset
+                if (offset <= 3) return offset + 1
+                return (offset + 2).coerceAtMost(formattedText.length)
+            }
+
+            override fun transformedToOriginal(offset: Int): Int {
+                if (offset <= 2) return offset
+                if (offset <= 5) return offset - 1
+                return (offset - 2).coerceAtMost(digits.length)
+            }
+        }
+
+        return TransformedText(AnnotatedString(formattedText), offsetMapping)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,8 +109,11 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     val postsLoadState by viewModel.postsLoadState.collectAsState()
     val postActionState by viewModel.postActionState.collectAsState()
     val selectedHouseholdId by viewModel.selectedHouseholdId.collectAsState()
+    val ownedColors by viewModel.ownedColors.collectAsState()
 
     LaunchedEffect(Unit) { viewModel.loadHouseholds() }
+
+    val focusManager = LocalFocusManager.current
 
     var showCreateDialog by remember { mutableStateOf(false) }
     var postToEdit by remember { mutableStateOf<Post?>(null) }
@@ -72,6 +123,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     var selectedType by remember { mutableStateOf("note") }
     var pointValue by remember { mutableStateOf("") }
     var dueAt by remember { mutableStateOf("") }
+    var selectedColor by remember { mutableStateOf<String?>(null) }
     var householdDropdownExpanded by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
 
@@ -87,6 +139,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                 selectedType = "note"
                 pointValue = ""
                 dueAt = ""
+                selectedColor = null
                 errorText = null
                 viewModel.resetCreateState()
             }
@@ -115,11 +168,46 @@ fun BoardScreen(modifier: Modifier = Modifier) {
         selectedType = "note"
         pointValue = ""
         dueAt = ""
+        selectedColor = null
         errorText = null
         viewModel.resetCreateState()
     }
 
+    fun handleCreatePost() {
+        val hid = selectedHouseholdId
+        if (title.isBlank()) {
+            errorText = "Please enter a title"
+        } else if (hid == null) {
+            errorText = "Please select a household"
+        } else {
+            val formattedDate = if (dueAt.length == 8) {
+                "${dueAt.substring(4, 8)}-${dueAt.substring(0, 2)}-${dueAt.substring(2, 4)}"
+            } else null
+
+            viewModel.createPost(
+                title = title.trim(),
+                body = body.trim(),
+                type = selectedType,
+                householdId = hid,
+                pointValue = pointValue.toIntOrNull(),
+                dueAt = formattedDate,
+                color = selectedColor
+            )
+        }
+    }
+
     val isLoading = createPostState is BoardViewModel.CreatePostState.Loading
+
+    // Shared colors for text fields to ensure black visibility
+    val blackTextFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = Color.Black,
+        unfocusedTextColor = Color.Black,
+        focusedLabelColor = Color.Black,
+        unfocusedLabelColor = Color.Black,
+        cursorColor = Color.Black,
+        focusedPlaceholderColor = Color.Gray,
+        unfocusedPlaceholderColor = Color.Gray
+    )
 
     Column(modifier = modifier.fillMaxSize()) {
         if (households.isNotEmpty()) {
@@ -133,13 +221,19 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                     FilterChip(
                         selected = household.household_id == selectedHouseholdId,
                         onClick = { viewModel.selectHousehold(household.household_id) },
-                        label = { Text(household.household_name) }
+                        label = { Text(household.household_name, color = Color.Black) },
+                        modifier = Modifier.handDrawnBorder(),
+                        shape = RoundedCornerShape(0.dp),
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = Color(0xFFD1C4E9), // Matching light purple
+                            containerColor = Color.White
+                        )
                     )
                 }
             }
         }
 
-        Box(modifier = Modifier.weight(1f)) {
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
             when (val state = postsLoadState) {
                 is BoardViewModel.PostsLoadState.Loading -> {
                     CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
@@ -154,18 +248,13 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                     )
                 }
                 is BoardViewModel.PostsLoadState.Success -> {
-                    val visiblePosts = if (selectedHouseholdId != null)
-                        state.posts.filter { it.household_id == selectedHouseholdId }
-                    else
-                        state.posts
+                    val visiblePosts = state.posts.filter { post ->
+                        val hidMatch = selectedHouseholdId == null || post.household_id == selectedHouseholdId
+                        val isActive = post.type == "note" || post.status == "pending"
+                        hidMatch && isActive
+                    }
 
-                    if (visiblePosts.isEmpty()) {
-                        Text(
-                            text = "No posts yet",
-                            modifier = Modifier.align(Alignment.Center),
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                    } else {
+                    if (visiblePosts.isNotEmpty()) {
                         LazyColumn(
                             modifier = Modifier.fillMaxSize(),
                             contentPadding = androidx.compose.foundation.layout.PaddingValues(
@@ -176,7 +265,10 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                             items(visiblePosts, key = { it.post_id ?: it.hashCode() }) { post ->
                                 PostCard(
                                     post = post,
-                                    onEdit = { postToEdit = post },
+                                    onEdit = { 
+                                        postToEdit = post 
+                                        dueAt = post.due_at?.filter { it.isDigit() } ?: ""
+                                    },
                                     onDelete = { postToDelete = post },
                                     onComplete = { viewModel.completeChore(post) }
                                 )
@@ -191,6 +283,10 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
                     .padding(16.dp)
+                    .handDrawnBorder(),
+                shape = RoundedCornerShape(0.dp),
+                containerColor = Color.White,
+                contentColor = Color.Black
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Create post")
             }
@@ -200,22 +296,25 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     if (showCreateDialog) {
         AlertDialog(
             onDismissRequest = { if (!isLoading) resetDialogState() },
-            title = { Text("Create Post") },
+            title = { Text("Create Post", color = Color.Black) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Type selector
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         FilterChip(
                             selected = selectedType == "note",
                             onClick = { selectedType = "note" },
                             label = { Text("Note") },
-                            enabled = !isLoading
+                            enabled = !isLoading,
+                            modifier = Modifier.handDrawnBorder(),
+                            shape = RoundedCornerShape(0.dp)
                         )
                         FilterChip(
                             selected = selectedType == "chore",
                             onClick = { selectedType = "chore" },
                             label = { Text("Chore") },
-                            enabled = !isLoading
+                            enabled = !isLoading,
+                            modifier = Modifier.handDrawnBorder(),
+                            shape = RoundedCornerShape(0.dp)
                         )
                     }
 
@@ -224,40 +323,106 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                         onValueChange = { title = it },
                         label = { Text("Title") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !isLoading
+                        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                        shape = RoundedCornerShape(0.dp),
+                        enabled = !isLoading,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                        colors = blackTextFieldColors
                     )
 
                     OutlinedTextField(
                         value = body,
                         onValueChange = { body = it },
                         label = { Text("Body") },
-                        minLines = 3,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !isLoading
+                        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                        shape = RoundedCornerShape(0.dp),
+                        enabled = !isLoading,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = if (selectedType == "chore") ImeAction.Next else ImeAction.Done),
+                        keyboardActions = KeyboardActions(
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) },
+                            onDone = { 
+                                if (selectedType == "note") {
+                                    focusManager.clearFocus()
+                                    handleCreatePost()
+                                }
+                            }
+                        ),
+                        colors = blackTextFieldColors
                     )
 
                     if (selectedType == "chore") {
                         OutlinedTextField(
                             value = pointValue,
-                            onValueChange = { pointValue = it },
+                            onValueChange = { if (it.all { char -> char.isDigit() }) pointValue = it },
                             label = { Text("Point Value") },
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !isLoading
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                            modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                            shape = RoundedCornerShape(0.dp),
+                            enabled = !isLoading,
+                            colors = blackTextFieldColors
                         )
                         OutlinedTextField(
                             value = dueAt,
-                            onValueChange = { dueAt = it },
-                            label = { Text("Due Date (YYYY-MM-DD)") },
+                            onValueChange = { input ->
+                                val digitsOnly = input.filter { it.isDigit() }
+                                if (digitsOnly.length <= 8) dueAt = digitsOnly
+                            },
+                            label = { Text("Due Date (MM/DD/YYYY)") },
+                            visualTransformation = DateVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = {
+                                focusManager.clearFocus()
+                                handleCreatePost()
+                            }),
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !isLoading
+                            modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                            shape = RoundedCornerShape(0.dp),
+                            enabled = !isLoading,
+                            colors = blackTextFieldColors
                         )
                     }
 
-                    // Household dropdown
+                    if (ownedColors.isNotEmpty()) {
+                        Text("Post Color", style = MaterialTheme.typography.labelMedium, color = Color.Black)
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(PostItCyan)
+                                        .clickable { selectedColor = null }
+                                        .handDrawnBorder(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (selectedColor == null) {
+                                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.Black))
+                                    }
+                                }
+                            }
+                            items(ownedColors) { colorItem ->
+                                val color = try { Color(android.graphics.Color.parseColor(colorItem.value)) } catch (e: Exception) { Color.Gray }
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(color)
+                                        .clickable { selectedColor = colorItem.value }
+                                        .handDrawnBorder(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (selectedColor == colorItem.value) {
+                                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.Black))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     ExposedDropdownMenuBox(
                         expanded = householdDropdownExpanded,
                         onExpandedChange = { if (!isLoading) householdDropdownExpanded = it }
@@ -270,8 +435,11 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(householdDropdownExpanded) },
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .menuAnchor(MenuAnchorType.PrimaryNotEditable),
-                            enabled = !isLoading
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                .handDrawnBorder(),
+                            shape = RoundedCornerShape(0.dp),
+                            enabled = !isLoading,
+                            colors = blackTextFieldColors
                         )
                         ExposedDropdownMenu(
                             expanded = householdDropdownExpanded,
@@ -279,7 +447,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                         ) {
                             households.forEach { household ->
                                 DropdownMenuItem(
-                                    text = { Text(household.household_name) },
+                                    text = { Text(household.household_name, color = Color.Black) },
                                     onClick = {
                                         viewModel.selectHousehold(household.household_id)
                                         householdDropdownExpanded = false
@@ -297,31 +465,23 @@ fun BoardScreen(modifier: Modifier = Modifier) {
             confirmButton = {
                 Button(
                     onClick = {
-                        val hid = selectedHouseholdId
-                        if (title.isBlank()) {
-                            errorText = "Please enter a title"
-                        } else if (hid == null) {
-                            errorText = "Please select a household"
-                        } else {
-                            viewModel.createPost(
-                                title = title.trim(),
-                                body = body.trim(),
-                                type = selectedType,
-                                householdId = hid,
-                                pointValue = pointValue.toIntOrNull(),
-                                dueAt = dueAt.ifBlank { null }
-                            )
-                        }
+                        focusManager.clearFocus()
+                        handleCreatePost()
                     },
-                    enabled = !isLoading
+                    enabled = !isLoading,
+                    modifier = Modifier.handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp)
                 ) {
                     if (isLoading) CircularProgressIndicator() else Text("Create")
                 }
             },
             dismissButton = {
-                TextButton(
+                Button(
                     onClick = { resetDialogState() },
-                    enabled = !isLoading
+                    enabled = !isLoading,
+                    modifier = Modifier.handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
                 ) {
                     Text("Cancel")
                 }
@@ -329,18 +489,37 @@ fun BoardScreen(modifier: Modifier = Modifier) {
         )
     }
 
-    // Edit dialog
     postToEdit?.let { post ->
         val actionLoading = postActionState is BoardViewModel.PostActionState.Loading
         var editTitle by remember(post.post_id) { mutableStateOf(post.title ?: "") }
         var editBody by remember(post.post_id) { mutableStateOf(post.body ?: "") }
         var editPointValue by remember(post.post_id) { mutableStateOf(post.point_value?.toString() ?: "") }
-        var editDueAt by remember(post.post_id) { mutableStateOf(post.due_at ?: "") }
+        var editDueAt by remember(post.post_id) { mutableStateOf(post.due_at?.filter { it.isDigit() } ?: "") }
+        var editColor by remember(post.post_id) { mutableStateOf(post.color) }
         var editError by remember(post.post_id) { mutableStateOf<String?>(null) }
+
+        fun handleUpdatePost() {
+            if (editTitle.isBlank()) {
+                editError = "Title cannot be empty"
+            } else {
+                val formattedDate = if (editDueAt.length == 8) {
+                    "${editDueAt.substring(4, 8)}-${editDueAt.substring(0, 2)}-${editDueAt.substring(2, 4)}"
+                } else null
+
+                viewModel.updatePost(
+                    post = post,
+                    title = editTitle.trim(),
+                    body = editBody.trim(),
+                    pointValue = editPointValue.toIntOrNull(),
+                    dueAt = formattedDate,
+                    color = editColor
+                )
+            }
+        }
 
         AlertDialog(
             onDismissRequest = { if (!actionLoading) { postToEdit = null; viewModel.resetActionState() } },
-            title = { Text("Edit Post") },
+            title = { Text("Edit Post", color = Color.Black) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -348,36 +527,104 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                         onValueChange = { editTitle = it },
                         label = { Text("Title") },
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !actionLoading
+                        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                        shape = RoundedCornerShape(0.dp),
+                        enabled = !actionLoading,
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
+                        keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                        colors = blackTextFieldColors
                     )
                     OutlinedTextField(
                         value = editBody,
                         onValueChange = { editBody = it },
                         label = { Text("Body") },
-                        minLines = 3,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !actionLoading
+                        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                        shape = RoundedCornerShape(0.dp),
+                        enabled = !actionLoading,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(imeAction = if (post.type == "chore") ImeAction.Next else ImeAction.Done),
+                        keyboardActions = KeyboardActions(
+                            onNext = { focusManager.moveFocus(FocusDirection.Down) },
+                            onDone = {
+                                if (post.type != "chore") {
+                                    focusManager.clearFocus()
+                                    handleUpdatePost()
+                                }
+                            }
+                        ),
+                        colors = blackTextFieldColors
                     )
                     if (post.type == "chore") {
                         OutlinedTextField(
                             value = editPointValue,
-                            onValueChange = { editPointValue = it },
+                            onValueChange = { if (it.all { char -> char.isDigit() }) editPointValue = it },
                             label = { Text("Point Value") },
                             singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !actionLoading
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
+                            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+                            modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                            shape = RoundedCornerShape(0.dp),
+                            enabled = !actionLoading,
+                            colors = blackTextFieldColors
                         )
                         OutlinedTextField(
                             value = editDueAt,
-                            onValueChange = { editDueAt = it },
-                            label = { Text("Due Date (YYYY-MM-DD)") },
+                            onValueChange = { input ->
+                                val digitsOnly = input.filter { it.isDigit() }
+                                if (digitsOnly.length <= 8) editDueAt = digitsOnly
+                            },
+                            label = { Text("Due Date (MM/DD/YYYY)") },
+                            visualTransformation = DateVisualTransformation(),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+                            keyboardActions = KeyboardActions(onDone = {
+                                focusManager.clearFocus()
+                                handleUpdatePost()
+                            }),
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            enabled = !actionLoading
+                            modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                            shape = RoundedCornerShape(0.dp),
+                            enabled = !actionLoading,
+                            colors = blackTextFieldColors
                         )
                     }
+
+                    if (ownedColors.isNotEmpty()) {
+                        Text("Post Color", style = MaterialTheme.typography.labelMedium, color = Color.Black)
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(PostItCyan)
+                                        .clickable { editColor = null }
+                                        .handDrawnBorder(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (editColor == null) {
+                                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.Black))
+                                    }
+                                }
+                            }
+                            items(ownedColors) { colorItem ->
+                                val color = try { Color(android.graphics.Color.parseColor(colorItem.value)) } catch (e: Exception) { Color.Gray }
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .clip(CircleShape)
+                                        .background(color)
+                                        .clickable { editColor = colorItem.value }
+                                        .handDrawnBorder(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    if (editColor == colorItem.value) {
+                                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.Black))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     editError?.let { Text(text = it, color = Color.Red) }
                     (postActionState as? BoardViewModel.PostActionState.Error)?.let {
                         Text(text = it.message, color = Color.Red)
@@ -387,52 +634,52 @@ fun BoardScreen(modifier: Modifier = Modifier) {
             confirmButton = {
                 Button(
                     onClick = {
-                        if (editTitle.isBlank()) {
-                            editError = "Title cannot be empty"
-                        } else {
-                            viewModel.updatePost(
-                                post = post,
-                                title = editTitle.trim(),
-                                body = editBody.trim(),
-                                pointValue = editPointValue.toIntOrNull(),
-                                dueAt = editDueAt.ifBlank { null }
-                            )
-                        }
+                        focusManager.clearFocus()
+                        handleUpdatePost()
                     },
-                    enabled = !actionLoading
+                    enabled = !actionLoading,
+                    modifier = Modifier.handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp)
                 ) {
                     if (actionLoading) CircularProgressIndicator() else Text("Save")
                 }
             },
             dismissButton = {
-                TextButton(
+                Button(
                     onClick = { postToEdit = null; viewModel.resetActionState() },
-                    enabled = !actionLoading
+                    enabled = !actionLoading,
+                    modifier = Modifier.handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
                 ) { Text("Cancel") }
             }
         )
     }
 
-    // Delete confirmation
     postToDelete?.let { post ->
         val actionLoading = postActionState is BoardViewModel.PostActionState.Loading
         AlertDialog(
             onDismissRequest = { if (!actionLoading) { postToDelete = null; viewModel.resetActionState() } },
-            title = { Text("Delete Post") },
-            text = { Text("Are you sure you want to delete \"${post.title ?: "this post"}\"?") },
+            title = { Text("Delete Post", color = Color.Black) },
+            text = { Text("Are you sure you want to delete \"${post.title ?: "this post"}\"?", color = Color.Black) },
             confirmButton = {
                 Button(
-                    onClick = { viewModel.deletePost(post.post_id!!) },
+                    onClick = { post.post_id?.let { viewModel.deletePost(it) } },
                     enabled = !actionLoading,
+                    modifier = Modifier.handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color.Red)
                 ) {
                     if (actionLoading) CircularProgressIndicator() else Text("Delete")
                 }
             },
             dismissButton = {
-                TextButton(
+                Button(
                     onClick = { postToDelete = null; viewModel.resetActionState() },
-                    enabled = !actionLoading
+                    enabled = !actionLoading,
+                    modifier = Modifier.handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
                 ) { Text("Cancel") }
             }
         )
@@ -446,9 +693,15 @@ private fun PostCard(
     onDelete: () -> Unit,
     onComplete: () -> Unit
 ) {
+    val backgroundColor = post.color?.let { 
+        try { Color(android.graphics.Color.parseColor(it)) } catch (e: Exception) { PostItCyan }
+    } ?: PostItCyan
+
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+        shape = RoundedCornerShape(0.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(containerColor = backgroundColor)
     ) {
         Column(modifier = Modifier.padding(12.dp)) {
             Row(
@@ -461,17 +714,17 @@ private fun PostCard(
                         text = it,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
+                        color = Color.Black
                     )
                 }
                 Text(
                     text = post.type.replaceFirstChar { it.uppercase() },
                     style = MaterialTheme.typography.labelSmall,
-                    color = if (post.type == "chore") MaterialTheme.colorScheme.primary
-                    else MaterialTheme.colorScheme.secondary
+                    color = Color.Black
                 )
                 IconButton(onClick = onEdit) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.padding(4.dp))
+                    Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.padding(4.dp), tint = Color.Black)
                 }
                 IconButton(onClick = onDelete) {
                     Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.padding(4.dp))
@@ -479,7 +732,7 @@ private fun PostCard(
             }
             post.body?.let {
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(text = it, style = MaterialTheme.typography.bodyMedium)
+                Text(text = it, style = MaterialTheme.typography.bodyMedium, color = Color.Black)
             }
             if (post.type == "chore") {
                 Spacer(modifier = Modifier.height(4.dp))
@@ -488,23 +741,34 @@ private fun PostCard(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        post.status?.let {
-                            Text(
-                                text = it.replaceFirstChar { c -> c.uppercase() },
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
-                        post.point_value?.let {
-                            Text(text = "$it pts", style = MaterialTheme.typography.labelSmall)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            post.status?.let {
+                                Text(
+                                    text = it.replaceFirstChar { c -> c.uppercase() },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color.Black
+                                )
+                            }
+                            post.point_value?.let {
+                                Text(text = "$it pts", style = MaterialTheme.typography.labelSmall, color = Color.Black)
+                            }
                         }
                         post.due_at?.let {
-                            Text(text = "Due: $it", style = MaterialTheme.typography.labelSmall)
+                            val displayDate = if (it.length == 10 && it[4] == '-' && it[7] == '-') {
+                                "${it.substring(5, 7)}/${it.substring(8, 10)}/${it.substring(0, 4)}"
+                            } else it
+                            Text(text = "Due: $displayDate", style = MaterialTheme.typography.labelSmall, color = Color.Black)
                         }
                     }
                     if (post.status == "pending") {
-                        TextButton(onClick = onComplete) {
-                            Text("Mark Complete")
+                        Button(
+                            onClick = onComplete,
+                            modifier = Modifier.handDrawnBorder(),
+                            shape = RoundedCornerShape(0.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                        ) {
+                            Text("Complete", style = MaterialTheme.typography.labelSmall)
                         }
                     }
                 }

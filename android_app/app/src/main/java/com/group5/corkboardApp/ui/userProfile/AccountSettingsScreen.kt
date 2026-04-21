@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -45,10 +46,11 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.group5.corkboardApp.ui.theme.HandDrawnBlack
+import com.group5.corkboardApp.ui.theme.handDrawnBorder
 
 class PhoneVisualTransformation : VisualTransformation {
     override fun filter(text: AnnotatedString): TransformedText {
-        // Only keep digits
         val digits = text.text.filter { it.isDigit() }
         val out = StringBuilder()
         
@@ -86,7 +88,7 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
     val currentUserData by viewModel.currentUserData.collectAsState()
     val passwordVerificationStatus by viewModel.passwordVerificationStatus.collectAsState()
     
-    val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarHostState = SnackbarHostState()
     val focusManager = LocalFocusManager.current
     
     var name by remember { mutableStateOf("") }
@@ -103,7 +105,6 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
         email = currentUserData.email
     }
 
-    // Show Snackbar when status changes to Success or Error
     LaunchedEffect(updateStatus) {
         when (val state = updateStatus) {
             is AccountSettingsViewModel.UpdateState.Success -> {
@@ -145,6 +146,8 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
+                    .handDrawnBorder(),
+                shape = RoundedCornerShape(0.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = "Update Profile Info", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -153,8 +156,9 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                         value = name, 
                         onValueChange = { name = it }, 
                         label = { Text("Full Name") }, 
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
                         singleLine = true,
+                        shape = RoundedCornerShape(0.dp),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         keyboardActions = KeyboardActions(
                             onNext = { focusManager.moveFocus(FocusDirection.Down) }
@@ -165,8 +169,9 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                         value = displayName, 
                         onValueChange = { displayName = it }, 
                         label = { Text("Display Name") }, 
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
                         singleLine = true,
+                        shape = RoundedCornerShape(0.dp),
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         keyboardActions = KeyboardActions(
                             onNext = { focusManager.moveFocus(FocusDirection.Down) }
@@ -182,8 +187,9 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                             }
                         }, 
                         label = { Text("Phone Number") }, 
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
                         visualTransformation = PhoneVisualTransformation(),
+                        shape = RoundedCornerShape(0.dp),
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Number,
                             imeAction = ImeAction.Done
@@ -203,7 +209,8 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                             focusManager.clearFocus()
                             viewModel.updateProfile(name, displayName, phone) 
                         },
-                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp).handDrawnBorder(),
+                        shape = RoundedCornerShape(0.dp),
                         enabled = name.isNotBlank() || displayName.isNotBlank() || phone.isNotBlank()
                     ) {
                         Text("Update Profile")
@@ -216,6 +223,8 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
+                    .handDrawnBorder(),
+                shape = RoundedCornerShape(0.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = "Update Email", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -224,8 +233,9 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                         value = email, 
                         onValueChange = { email = it }, 
                         label = { Text("New Email") }, 
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
                         singleLine = true,
+                        shape = RoundedCornerShape(0.dp),
                         keyboardOptions = KeyboardOptions(
                             keyboardType = KeyboardType.Email,
                             imeAction = ImeAction.Done
@@ -244,7 +254,8 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                             focusManager.clearFocus()
                             viewModel.updateEmail(email) 
                         },
-                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(top = 16.dp).handDrawnBorder(),
+                        shape = RoundedCornerShape(0.dp),
                         enabled = email.isNotBlank()
                     ) {
                         Text("Update Email")
@@ -252,11 +263,13 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                 }
             }
 
-            // Password Section - Just a button now
+            // Password Section
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
+                    .handDrawnBorder(),
+                shape = RoundedCornerShape(0.dp)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(text = "Security", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -266,11 +279,23 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                             viewModel.resetPasswordVerification()
                             showPasswordDialog = true 
                         },
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                        shape = RoundedCornerShape(0.dp)
                     ) {
                         Text("Change Password")
                     }
                 }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Back to Profile
+            Button(
+                onClick = onBack,
+                modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                shape = RoundedCornerShape(0.dp)
+            ) {
+                Text("Back to Profile")
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -278,22 +303,17 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
             // Logout Section
             Button(
                 onClick = { viewModel.signOut() },
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+                shape = RoundedCornerShape(0.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = Color.Red, contentColor = Color.White)
             ) {
                 Text("Log Out")
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
             // Loading Indicator
             if (updateStatus is AccountSettingsViewModel.UpdateState.Loading) {
+                Spacer(modifier = Modifier.height(16.dp))
                 CircularProgressIndicator()
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            TextButton(onClick = onBack) {
-                Text("Back to Profile")
             }
         }
     }
@@ -324,7 +344,6 @@ fun ChangePasswordDialog(
     
     val focusManager = LocalFocusManager.current
 
-    // Validation rules
     val isMinLength = newPassword.length >= 6
     val hasLetter = newPassword.any { it.isLetter() }
     val hasDigit = newPassword.any { it.isDigit() }
@@ -337,30 +356,18 @@ fun ChangePasswordDialog(
             Column {
                 when (verificationStatus) {
                     is AccountSettingsViewModel.PasswordVerificationStatus.Success -> {
-                        Text(
-                            text = "New Password Rules:",
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "• At least 6 characters\n• At least one letter\n• At least one number",
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
+                        Text(text = "New Password Rules:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                        Text(text = "• At least 6 characters\n• At least one letter\n• At least one number", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(bottom = 8.dp))
                         
                         OutlinedTextField(
                             value = newPassword,
                             onValueChange = { newPassword = it },
                             label = { Text("New Password") },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().handDrawnBorder(),
                             visualTransformation = PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Password,
-                                imeAction = ImeAction.Next
-                            ),
-                            keyboardActions = KeyboardActions(
-                                onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                            ),
+                            shape = RoundedCornerShape(0.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
+                            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
                             singleLine = true
                         )
                         Spacer(modifier = Modifier.height(8.dp))
@@ -368,12 +375,10 @@ fun ChangePasswordDialog(
                             value = confirmPassword,
                             onValueChange = { confirmPassword = it },
                             label = { Text("Confirm New Password") },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().handDrawnBorder(),
                             visualTransformation = PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Password,
-                                imeAction = ImeAction.Done
-                            ),
+                            shape = RoundedCornerShape(0.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                             keyboardActions = KeyboardActions(
                                 onDone = { 
                                     if (isPasswordValid && newPassword == confirmPassword) {
@@ -384,12 +389,7 @@ fun ChangePasswordDialog(
                             singleLine = true
                         )
                         if (newPassword.isNotBlank() && confirmPassword.isNotBlank() && newPassword != confirmPassword) {
-                            Text(
-                                text = "The passwords do not match",
-                                color = Color.Red,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
+                            Text(text = "The passwords do not match", color = Color.Red, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
                         }
                     }
                     else -> {
@@ -399,12 +399,10 @@ fun ChangePasswordDialog(
                             value = currentPassword,
                             onValueChange = { currentPassword = it },
                             label = { Text("Current Password") },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier.fillMaxWidth().handDrawnBorder(),
                             visualTransformation = PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(
-                                keyboardType = KeyboardType.Password,
-                                imeAction = ImeAction.Done
-                            ),
+                            shape = RoundedCornerShape(0.dp),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Done),
                             keyboardActions = KeyboardActions(
                                 onDone = { 
                                     if (currentPassword.isNotBlank()) {
@@ -415,37 +413,28 @@ fun ChangePasswordDialog(
                             singleLine = true
                         )
                         if (verificationStatus is AccountSettingsViewModel.PasswordVerificationStatus.Error) {
-                            Text(
-                                text = (verificationStatus as AccountSettingsViewModel.PasswordVerificationStatus.Error).message,
-                                color = Color.Red,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(top = 4.dp)
-                            )
+                            Text(text = (verificationStatus as AccountSettingsViewModel.PasswordVerificationStatus.Error).message, color = Color.Red, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
                         }
                     }
                 }
             }
         },
         confirmButton = {
-            when (verificationStatus) {
-                is AccountSettingsViewModel.PasswordVerificationStatus.Success -> {
-                    Button(
-                        onClick = { onUpdate(newPassword) },
-                        enabled = isPasswordValid && newPassword == confirmPassword
-                    ) {
-                        Text("Update")
-                    }
-                }
-                is AccountSettingsViewModel.PasswordVerificationStatus.Loading -> {
+            val isSuccess = verificationStatus is AccountSettingsViewModel.PasswordVerificationStatus.Success
+            val text = if (isSuccess) "Update" else "Next"
+            val action = if (isSuccess) { { onUpdate(newPassword) } } else { { onVerify(currentPassword) } }
+            val enabled = if (isSuccess) (isPasswordValid && newPassword == confirmPassword) else currentPassword.isNotBlank()
+
+            Button(
+                onClick = action,
+                enabled = enabled,
+                modifier = Modifier.handDrawnBorder(),
+                shape = RoundedCornerShape(0.dp)
+            ) {
+                if (verificationStatus is AccountSettingsViewModel.PasswordVerificationStatus.Loading) {
                     CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
-                }
-                else -> {
-                    Button(
-                        onClick = { onVerify(currentPassword) },
-                        enabled = currentPassword.isNotBlank()
-                    ) {
-                        Text("Next")
-                    }
+                } else {
+                    Text(text)
                 }
             }
         },
