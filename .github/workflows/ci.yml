@@ -30,10 +30,13 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Create local.properties
+        env:
+          SUPABASE_URL: ${{secrets.SUPABASE_URL}}
+          SUPABASE_KEY: ${{secrets.SUPABASE_KEY}}
         run: |
           echo "sdk.dir=$ANDROID_HOME" > android_app/local.properties
-          echo 'SUPABASE_URL="https://placeholder.supabase.co"' >> android_app/local.properties
-          echo 'SUPABASE_KEY="placeholder-key"' >> android_app/local.properties
+          echo "SUPABASE_URL=\"$SUPABASE_URL\"" >> android_app/local.properties
+          echo "SUPABASE_KEY=\"$SUPABASE_KEY\"" >> android_app/local.properties
 
       - name: Grant execute permission for gradlew
         run: chmod +x android_app/gradlew
