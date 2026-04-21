@@ -16,9 +16,11 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -120,6 +122,23 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
         }
     }
 
+    val blackTextFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = Color.Black,
+        unfocusedTextColor = Color.Black,
+        focusedLabelColor = Color.Black,
+        unfocusedLabelColor = Color.Black,
+        cursorColor = Color.Black,
+        focusedPlaceholderColor = Color.Gray,
+        unfocusedPlaceholderColor = Color.Gray,
+        focusedBorderColor = Color.Black,
+        unfocusedBorderColor = Color.Black
+    )
+
+    val blackButtonColors = ButtonDefaults.buttonColors(
+        containerColor = Color.Black,
+        contentColor = Color.White
+    )
+
     val scrollState = rememberScrollState()
 
     Scaffold(
@@ -136,7 +155,8 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
         ) {
             Text(
                 text = "Account Settings",
-                style = MaterialTheme.typography.headlineMedium
+                style = MaterialTheme.typography.headlineMedium,
+                color = Color.Black
             )
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -147,10 +167,16 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
                     .handDrawnBorder(),
-                shape = RoundedCornerShape(0.dp)
+                shape = RoundedCornerShape(0.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "Update Profile Info", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "Update Profile Info", 
+                        style = MaterialTheme.typography.titleMedium, 
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = name, 
@@ -162,7 +188,8 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         keyboardActions = KeyboardActions(
                             onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                        )
+                        ),
+                        colors = blackTextFieldColors
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
@@ -175,7 +202,8 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                         keyboardActions = KeyboardActions(
                             onNext = { focusManager.moveFocus(FocusDirection.Down) }
-                        )
+                        ),
+                        colors = blackTextFieldColors
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
@@ -202,7 +230,8 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                                 }
                             }
                         ),
-                        singleLine = true
+                        singleLine = true,
+                        colors = blackTextFieldColors
                     )
                     Button(
                         onClick = { 
@@ -211,7 +240,8 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                         },
                         modifier = Modifier.fillMaxWidth().padding(top = 16.dp).handDrawnBorder(),
                         shape = RoundedCornerShape(0.dp),
-                        enabled = name.isNotBlank() || displayName.isNotBlank() || phone.isNotBlank()
+                        enabled = name.isNotBlank() || displayName.isNotBlank() || phone.isNotBlank(),
+                        colors = blackButtonColors
                     ) {
                         Text("Update Profile")
                     }
@@ -224,10 +254,16 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
                     .handDrawnBorder(),
-                shape = RoundedCornerShape(0.dp)
+                shape = RoundedCornerShape(0.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "Update Email", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "Update Email", 
+                        style = MaterialTheme.typography.titleMedium, 
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
                     OutlinedTextField(
                         value = email, 
@@ -247,7 +283,8 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                                     viewModel.updateEmail(email)
                                 }
                             }
-                        )
+                        ),
+                        colors = blackTextFieldColors
                     )
                     Button(
                         onClick = { 
@@ -256,7 +293,8 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                         },
                         modifier = Modifier.fillMaxWidth().padding(top = 16.dp).handDrawnBorder(),
                         shape = RoundedCornerShape(0.dp),
-                        enabled = email.isNotBlank()
+                        enabled = email.isNotBlank(),
+                        colors = blackButtonColors
                     ) {
                         Text("Update Email")
                     }
@@ -269,10 +307,16 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                     .fillMaxWidth()
                     .padding(vertical = 8.dp)
                     .handDrawnBorder(),
-                shape = RoundedCornerShape(0.dp)
+                shape = RoundedCornerShape(0.dp),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(text = "Security", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "Security", 
+                        style = MaterialTheme.typography.titleMedium, 
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
                     Spacer(modifier = Modifier.height(8.dp))
                     Button(
                         onClick = { 
@@ -280,7 +324,8 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
                             showPasswordDialog = true 
                         },
                         modifier = Modifier.fillMaxWidth().handDrawnBorder(),
-                        shape = RoundedCornerShape(0.dp)
+                        shape = RoundedCornerShape(0.dp),
+                        colors = blackButtonColors
                     ) {
                         Text("Change Password")
                     }
@@ -293,7 +338,8 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
             Button(
                 onClick = onBack,
                 modifier = Modifier.fillMaxWidth().handDrawnBorder(),
-                shape = RoundedCornerShape(0.dp)
+                shape = RoundedCornerShape(0.dp),
+                colors = blackButtonColors
             ) {
                 Text("Back to Profile")
             }
@@ -313,7 +359,7 @@ fun AccountSettingsScreen(onBack: () -> Unit) {
             // Loading Indicator
             if (updateStatus is AccountSettingsViewModel.UpdateState.Loading) {
                 Spacer(modifier = Modifier.height(16.dp))
-                CircularProgressIndicator()
+                CircularProgressIndicator(color = Color.Black)
             }
         }
     }
@@ -349,15 +395,42 @@ fun ChangePasswordDialog(
     val hasDigit = newPassword.any { it.isDigit() }
     val isPasswordValid = isMinLength && hasLetter && hasDigit
 
+    val blackTextFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = Color.Black,
+        unfocusedTextColor = Color.Black,
+        focusedLabelColor = Color.Black,
+        unfocusedLabelColor = Color.Black,
+        cursorColor = Color.Black,
+        focusedPlaceholderColor = Color.Gray,
+        unfocusedPlaceholderColor = Color.Gray,
+        focusedBorderColor = Color.Black,
+        unfocusedBorderColor = Color.Black
+    )
+
+    val blackButtonColors = ButtonDefaults.buttonColors(
+        containerColor = Color.Black,
+        contentColor = Color.White
+    )
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Change Password") },
+        title = { Text("Change Password", color = Color.Black) },
         text = {
             Column {
                 when (verificationStatus) {
                     is AccountSettingsViewModel.PasswordVerificationStatus.Success -> {
-                        Text(text = "New Password Rules:", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
-                        Text(text = "• At least 6 characters\n• At least one letter\n• At least one number", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(bottom = 8.dp))
+                        Text(
+                            text = "New Password Rules:", 
+                            style = MaterialTheme.typography.labelMedium, 
+                            fontWeight = FontWeight.Bold,
+                            color = Color.Black
+                        )
+                        Text(
+                            text = "• At least 6 characters\n• At least one letter\n• At least one number", 
+                            style = MaterialTheme.typography.labelSmall, 
+                            modifier = Modifier.padding(bottom = 8.dp),
+                            color = Color.Black
+                        )
                         
                         OutlinedTextField(
                             value = newPassword,
@@ -368,7 +441,8 @@ fun ChangePasswordDialog(
                             shape = RoundedCornerShape(0.dp),
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
                             keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
-                            singleLine = true
+                            singleLine = true,
+                            colors = blackTextFieldColors
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
@@ -386,14 +460,15 @@ fun ChangePasswordDialog(
                                     }
                                 }
                             ),
-                            singleLine = true
+                            singleLine = true,
+                            colors = blackTextFieldColors
                         )
                         if (newPassword.isNotBlank() && confirmPassword.isNotBlank() && newPassword != confirmPassword) {
                             Text(text = "The passwords do not match", color = Color.Red, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
                         }
                     }
                     else -> {
-                        Text("Please enter your current password to continue.")
+                        Text("Please enter your current password to continue.", color = Color.Black)
                         Spacer(modifier = Modifier.height(8.dp))
                         OutlinedTextField(
                             value = currentPassword,
@@ -410,7 +485,8 @@ fun ChangePasswordDialog(
                                     }
                                 }
                             ),
-                            singleLine = true
+                            singleLine = true,
+                            colors = blackTextFieldColors
                         )
                         if (verificationStatus is AccountSettingsViewModel.PasswordVerificationStatus.Error) {
                             Text(text = (verificationStatus as AccountSettingsViewModel.PasswordVerificationStatus.Error).message, color = Color.Red, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
@@ -429,17 +505,21 @@ fun ChangePasswordDialog(
                 onClick = action,
                 enabled = enabled,
                 modifier = Modifier.handDrawnBorder(),
-                shape = RoundedCornerShape(0.dp)
+                shape = RoundedCornerShape(0.dp),
+                colors = blackButtonColors
             ) {
                 if (verificationStatus is AccountSettingsViewModel.PasswordVerificationStatus.Loading) {
-                    CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp))
+                    CircularProgressIndicator(modifier = Modifier.padding(end = 8.dp), color = Color.White, strokeWidth = 2.dp)
                 } else {
                     Text(text)
                 }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
+            TextButton(
+                onClick = onDismiss,
+                colors = ButtonDefaults.textButtonColors(contentColor = Color.Black)
+            ) {
                 Text("Cancel")
             }
         }

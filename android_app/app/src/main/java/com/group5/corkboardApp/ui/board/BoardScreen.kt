@@ -200,7 +200,9 @@ fun BoardScreen(modifier: Modifier = Modifier) {
         unfocusedLabelColor = Color.Black,
         cursorColor = Color.Black,
         focusedPlaceholderColor = Color.Gray,
-        unfocusedPlaceholderColor = Color.Gray
+        unfocusedPlaceholderColor = Color.Gray,
+        focusedBorderColor = Color.Black,
+        unfocusedBorderColor = Color.Black
     )
 
     Column(modifier = modifier.fillMaxSize()) {
