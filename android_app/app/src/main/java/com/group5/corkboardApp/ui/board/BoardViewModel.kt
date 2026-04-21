@@ -1,7 +1,9 @@
 package com.group5.corkboardApp.ui.board
 
+import android.app.Application
+import android.content.Context
 import android.util.Log
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.group5.corkboardApp.data.model.Household
 import com.group5.corkboardApp.data.model.Post
@@ -11,12 +13,17 @@ import com.group5.corkboardApp.data.repository.HouseholdRepository
 import com.group5.corkboardApp.data.repository.PostRepository
 import com.group5.corkboardApp.data.repository.ShopRepository
 import com.group5.corkboardApp.util.SessionManager
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-class BoardViewModel : ViewModel() {
+class BoardViewModel(application: Application) : AndroidViewModel(application) {
+
+    private val prefs = application.getSharedPreferences("board_settings", Context.MODE_PRIVATE)
+    private var loadHouseholdsJob: Job? = null
+    private var loadOwnedColorsJob: Job? = null
 
     sealed class HouseholdLoadState {
         data object Loading : HouseholdLoadState()
@@ -86,6 +93,7 @@ class BoardViewModel : ViewModel() {
     val postActionState: StateFlow<PostActionState> = _postActionState
 
     init {
+        // Initial load
         loadHouseholds()
         observeSelectedHousehold()
     }
@@ -96,43 +104,55 @@ class BoardViewModel : ViewModel() {
                 if (hid != null) {
                     val userId = AuthRepository.currentUser()?.id
                     if (userId != null) {
-                        loadOwnedColors(userId, hid)
+                        refreshDataForHousehold(userId, hid)
+                        // Load persisted default color for this household
+                        _defaultPostColor.value = prefs.getString("default_color_$hid", null)
                     }
                 }
-                // When household changes, refresh posts
-                val memberships = AuthRepository.currentUser()?.id?.let { HouseholdRepository.getUserMemberships(it) }
-                val householdIds = memberships?.map { m -> m.household_id } ?: emptyList()
-                loadPosts(householdIds)
+                // When household changes, refresh posts for all memberships
+                val userId = AuthRepository.currentUser()?.id
+                if (userId != null) {
+                    val memberships = HouseholdRepository.getUserMemberships(userId)
+                    val householdIds = memberships.map { it.household_id }
+                    loadPosts(householdIds)
+                }
             }
         }
     }
 
+    private suspend fun refreshDataForHousehold(userId: String, householdId: String) {
+        loadOwnedColors(userId, householdId)
+    }
+
     private fun loadOwnedColors(userId: String, householdId: String) {
-        viewModelScope.launch {
+        loadOwnedColorsJob?.cancel()
+        loadOwnedColorsJob = viewModelScope.launch {
             try {
                 val memberships = HouseholdRepository.getUserMemberships(userId)
                 val member = memberships.find { it.household_id == householdId }
                 if (member?.member_id != null) {
-                    // Fetch using the same two-step approach as ShopViewModel to avoid join permission issues
                     val ownedRewardIds = ShopRepository.getOwnedItems(member.member_id, householdId)
                     val dbItems = ShopRepository.getShopItems(householdId)
                     
                     val allPossibleItems = dbItems + universalItems
                     val ownedNames = allPossibleItems.filter { it.id in ownedRewardIds }.map { it.name }.toSet()
 
-                    _ownedColors.value = allPossibleItems
+                    val newOwnedColors = allPossibleItems
                         .filter { it.type == "color" }
                         .filter { item ->
                             item.id in ownedRewardIds || item.name in ownedNames
                         }
                         .distinctBy { it.name }
                         .map { item ->
-                            // Ensure the 'value' column (hex code) is properly used
                             if (item.value.startsWith("#") || item.value.length < 3) item 
                             else item.copy(value = "#${item.value}")
                         }
                     
-                    Log.d("BoardViewModel", "Loaded ${_ownedColors.value.size} owned colors using two-step fetch")
+                    // Only update if changed to avoid unnecessary recompositions
+                    if (_ownedColors.value != newOwnedColors) {
+                        _ownedColors.value = newOwnedColors
+                        Log.d("BoardViewModel", "Updated owned colors: ${newOwnedColors.size}")
+                    }
                 }
             } catch (e: Exception) {
                 Log.e("BoardViewModel", "Error loading owned colors", e)
@@ -142,37 +162,59 @@ class BoardViewModel : ViewModel() {
     }
 
     fun loadHouseholds() {
-        viewModelScope.launch {
-            if (_householdLoadState.value !is HouseholdLoadState.Success) {
-                _householdLoadState.value = HouseholdLoadState.Loading
-            }
+        if (loadHouseholdsJob?.isActive == true) return
+        
+        loadHouseholdsJob = viewModelScope.launch {
             try {
                 val userId = AuthRepository.currentUser()?.id
                     ?: throw Exception("User not authenticated")
-                val memberships = HouseholdRepository.getUserMemberships(userId)
-                val householdIds = memberships.map { it.household_id }
-                val households = if (householdIds.isEmpty()) emptyList()
-                else HouseholdRepository.getUserHouseholds(userId)
-                _householdLoadState.value = HouseholdLoadState.Success(households)
                 
-                // Only auto-select if nothing is currently selected
-                if (SessionManager.selectedHouseholdId.value == null && households.isNotEmpty()) {
-                    selectHousehold(households.first().household_id)
+                // 1. Fetch memberships first (source of truth for order)
+                // Use sortedBy so oldest first (smaller created_at is older)
+                val memberships = HouseholdRepository.getUserMemberships(userId)
+                    .sortedBy { it.created_at } 
+                
+                val householdIds = memberships.map { it.household_id }
+                if (householdIds.isEmpty()) {
+                    _householdLoadState.value = HouseholdLoadState.Success(emptyList())
+                    return@launch
                 }
+
+                // 2. Fetch household details
+                val unsortedHouseholds = HouseholdRepository.getUserHouseholds(userId)
+                
+                // 3. Create correctly ordered list based on membership creation date
+                val sortedHouseholds = householdIds.mapNotNull { id ->
+                    unsortedHouseholds.find { it.household_id == id }
+                }
+
+                // 4. Atomic update of state to prevent flickering
+                val currentState = _householdLoadState.value
+                if (currentState !is HouseholdLoadState.Success || currentState.households != sortedHouseholds) {
+                    _householdLoadState.value = HouseholdLoadState.Success(sortedHouseholds)
+                }
+                
+                // 5. Sync selection and refresh relevant data
+                val currentHid = SessionManager.selectedHouseholdId.value
+                if (currentHid == null && sortedHouseholds.isNotEmpty()) {
+                    selectHousehold(sortedHouseholds.first().household_id)
+                } else if (currentHid != null) {
+                    loadOwnedColors(userId, currentHid)
+                }
+                
                 loadPosts(householdIds)
             } catch (e: Exception) {
-                _householdLoadState.value = HouseholdLoadState.Error(
-                    e.localizedMessage ?: "Failed to load households"
-                )
+                if (_householdLoadState.value !is HouseholdLoadState.Success) {
+                    _householdLoadState.value = HouseholdLoadState.Error(
+                        e.localizedMessage ?: "Failed to load households"
+                    )
+                }
             }
         }
     }
 
     private fun loadPosts(householdIds: List<String>) {
         viewModelScope.launch {
-            if (_postsLoadState.value !is PostsLoadState.Success) {
-                _postsLoadState.value = PostsLoadState.Loading
-            }
             try {
                 val posts = PostRepository.getPostsForHouseholds(householdIds)
                 _postsLoadState.value = PostsLoadState.Success(posts)
@@ -216,10 +258,7 @@ class BoardViewModel : ViewModel() {
                     )
                 )
                 _createPostState.value = CreatePostState.Success
-                // Refresh post list after successful creation
-                val currentHouseholds = (_householdLoadState.value as? HouseholdLoadState.Success)
-                    ?.households?.map { it.household_id } ?: emptyList()
-                loadPosts(currentHouseholds)
+                refreshPosts()
             } catch (e: Exception) {
                 _createPostState.value = CreatePostState.Error(
                     e.localizedMessage ?: "Failed to create post"
@@ -229,7 +268,10 @@ class BoardViewModel : ViewModel() {
     }
 
     fun setDefaultPostColor(color: String?) {
+        val hid = selectedHouseholdId.value ?: return
         _defaultPostColor.value = color
+        // Save selection to SharedPreferences
+        prefs.edit().putString("default_color_$hid", color).apply()
     }
 
     fun resetCreateState() {

@@ -14,6 +14,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,7 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Contrast
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.AlertDialog
@@ -240,7 +243,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                 modifier = Modifier.padding(4.dp).handDrawnBorder(),
             ) {
                 Icon(
-                    imageVector = Icons.Default.Settings,
+                    imageVector = Icons.Default.Contrast,
                     contentDescription = "Default Post Color",
                     tint = Color.Black
                 )
@@ -308,46 +311,40 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     }
 
     if (showColorDialog) {
+        var pendingColor by remember { mutableStateOf(defaultPostColor) }
+
         AlertDialog(
             onDismissRequest = { showColorDialog = false },
             title = { Text("Default Post Color", color = Color.Black) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text("Select the default color for your new posts in this household:", color = Color.Black)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape)
-                                    .background(PostItCyan)
-                                    .clickable { 
-                                        viewModel.setDefaultPostColor(null)
-                                        showColorDialog = false
-                                    }
-                                    .handDrawnBorder(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                if (defaultPostColor == null) {
-                                    Box(modifier = Modifier.size(16.dp).clip(CircleShape).background(Color.Black))
-                                }
+                    
+                    val allItems = listOf<String?>(null) + ownedColors.map { it.value }
+                    
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(4),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.height(200.dp) // Set a fixed height or use wrapContentHeight
+                    ) {
+                        items(allItems) { colorValue ->
+                            val color = if (colorValue == null) PostItCyan else {
+                                try { Color(android.graphics.Color.parseColor(colorValue)) } catch (e: Exception) { Color.Gray }
                             }
-                        }
-                        items(ownedColors) { colorItem ->
-                            val color = try { Color(android.graphics.Color.parseColor(colorItem.value)) } catch (e: Exception) { Color.Gray }
+                            
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
                                     .clip(CircleShape)
                                     .background(color)
                                     .clickable { 
-                                        viewModel.setDefaultPostColor(colorItem.value)
-                                        showColorDialog = false
+                                        pendingColor = colorValue
                                     }
                                     .handDrawnBorder(),
                                 contentAlignment = Alignment.Center
                             ) {
-                                if (defaultPostColor == colorItem.value) {
+                                if (pendingColor == colorValue) {
                                     Box(modifier = Modifier.size(16.dp).clip(CircleShape).background(Color.Black))
                                 }
                             }
@@ -356,8 +353,25 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showColorDialog = false }) {
-                    Text("Close", color = Color.Black)
+                Button(
+                    onClick = {
+                        viewModel.setDefaultPostColor(pendingColor)
+                        showColorDialog = false
+                    },
+                    modifier = Modifier.handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp)
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { showColorDialog = false },
+                    modifier = Modifier.handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                ) {
+                    Text("Cancel")
                 }
             }
         )
