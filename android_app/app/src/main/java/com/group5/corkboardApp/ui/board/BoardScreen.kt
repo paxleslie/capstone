@@ -64,6 +64,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.group5.corkboardApp.data.model.Post
@@ -267,9 +268,9 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                 is BoardViewModel.PostsLoadState.Success -> {
                     val visiblePosts = state.posts.filter { post ->
                         val hidMatch = selectedHouseholdId == null || post.household_id == selectedHouseholdId
-                        val isActive = post.type == "note" || post.status == "pending"
-                        hidMatch && isActive
-                    }
+                        // We now show completed chores as well
+                        hidMatch
+                    }.sortedBy { it.status == "completed" } // Put completed at the bottom if you want, or keep original order
 
                     if (visiblePosts.isNotEmpty()) {
                         LazyColumn(
@@ -668,9 +669,14 @@ private fun PostCard(
     onDelete: () -> Unit,
     onComplete: () -> Unit
 ) {
-    val backgroundColor = post.color?.let { 
+    val isCompleted = post.status == "completed"
+    
+    val baseColor = post.color?.let { 
         try { Color(android.graphics.Color.parseColor(it)) } catch (e: Exception) { PostItCyan }
     } ?: PostItCyan
+
+    val backgroundColor = if (isCompleted) Color.LightGray.copy(alpha = 0.6f) else baseColor
+    val textDecoration = if (isCompleted) TextDecoration.LineThrough else TextDecoration.None
 
     Card(
         modifier = Modifier.fillMaxWidth().handDrawnBorder(),
@@ -678,75 +684,92 @@ private fun PostCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(containerColor = backgroundColor)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                post.title?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f),
-                        color = Color.Black
-                    )
-                }
-                Text(
-                    text = post.type.replaceFirstChar { it.uppercase() },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.Black
-                )
-                IconButton(onClick = onEdit) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.padding(4.dp), tint = Color.Black)
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.padding(4.dp))
-                }
-            }
-            post.body?.let {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(text = it, style = MaterialTheme.typography.bodyMedium, color = Color.Black)
-            }
-            if (post.type == "chore") {
-                Spacer(modifier = Modifier.height(4.dp))
+        Box {
+            Column(modifier = Modifier.padding(12.dp)) {
                 Row(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            post.status?.let {
-                                Text(
-                                    text = it.replaceFirstChar { c -> c.uppercase() },
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color.Black
-                                )
-                            }
-                            post.point_value?.let {
-                                Text(text = "$it pts", style = MaterialTheme.typography.labelSmall, color = Color.Black)
-                            }
-                        }
-                        post.due_at?.let {
-                            val displayDate = if (it.length == 10 && it[4] == '-' && it[7] == '-') {
-                                "${it.substring(5, 7)}/${it.substring(8, 10)}/${it.substring(0, 4)}"
-                            } else it
-                            Text(text = "Due: $displayDate", style = MaterialTheme.typography.labelSmall, color = Color.Black)
-                        }
+                    post.title?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f),
+                            color = Color.Black,
+                            textDecoration = textDecoration
+                        )
                     }
-                    if (post.status == "pending") {
-                        Button(
-                            onClick = onComplete,
-                            modifier = Modifier.handDrawnBorder(),
-                            shape = RoundedCornerShape(0.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
-                        ) {
-                            Text("Complete", style = MaterialTheme.typography.labelSmall)
+                    Text(
+                        text = post.type.replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.Black
+                    )
+                    IconButton(onClick = onEdit, enabled = !isCompleted) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.padding(4.dp), tint = if (isCompleted) Color.Gray else Color.Black)
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.padding(4.dp))
+                    }
+                }
+                post.body?.let {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = it, 
+                        style = MaterialTheme.typography.bodyMedium, 
+                        color = Color.Black,
+                        textDecoration = textDecoration
+                    )
+                }
+                if (post.type == "chore") {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                post.status?.let {
+                                    Text(
+                                        text = it.replaceFirstChar { c -> c.uppercase() },
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.Black
+                                    )
+                                }
+                                post.point_value?.let {
+                                    Text(text = "$it pts", style = MaterialTheme.typography.labelSmall, color = Color.Black)
+                                }
+                            }
+                            post.due_at?.let {
+                                val displayDate = if (it.length == 10 && it[4] == '-' && it[7] == '-') {
+                                    "${it.substring(5, 7)}/${it.substring(8, 10)}/${it.substring(0, 4)}"
+                                } else it
+                                Text(text = "Due: $displayDate", style = MaterialTheme.typography.labelSmall, color = Color.Black)
+                            }
+                        }
+                        if (post.status == "pending") {
+                            Button(
+                                onClick = onComplete,
+                                modifier = Modifier.handDrawnBorder(),
+                                shape = RoundedCornerShape(0.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                            ) {
+                                Text("Complete", style = MaterialTheme.typography.labelSmall)
+                            }
                         }
                     }
                 }
+            }
+            
+            if (isCompleted) {
+                // Gray film effect (optional, since we changed background color already)
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(Color.Gray.copy(alpha = 0.2f))
+                )
             }
         }
     }
