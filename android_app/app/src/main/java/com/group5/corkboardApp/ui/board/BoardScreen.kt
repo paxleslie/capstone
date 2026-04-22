@@ -310,7 +310,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                     .padding(16.dp)
                     .handDrawnBorder(),
                 shape = RoundedCornerShape(0.dp),
-                containerColor = Color.White,
+                containerColor = if (defaultPostColor == null) Color.White else parseColorSafe(defaultPostColor),
                 contentColor = Color.Black
             ) {
                 Icon(Icons.Default.Add, contentDescription = "Create post")
