@@ -252,7 +252,8 @@ class BoardViewModel(application: Application) : AndroidViewModel(application) {
                         status = if (type == "chore") "pending" else null,
                         due_at = dueAt?.ifBlank { null },
                         household_id = householdId,
-                        color = color ?: _defaultPostColor.value
+                        color = color ?: _defaultPostColor.value,
+                        sticker = _defaultStickerUrl.value
                     )
                 )
                 _createPostState.value = CreatePostState.Success

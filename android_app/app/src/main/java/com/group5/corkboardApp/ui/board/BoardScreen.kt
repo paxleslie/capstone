@@ -10,11 +10,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Contrast
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.AlertDialog
@@ -286,8 +289,8 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                             items(visiblePosts, key = { it.post_id ?: it.hashCode() }) { post ->
                                 PostCard(
                                     post = post,
-                                    stickerUrl = defaultStickerUrl,
-                                    onEdit = { 
+                                    stickerUrl = post.sticker,
+                                    onEdit = {
                                         postToEdit = post 
                                         dueAt = post.due_at?.filter { it.isDigit() } ?: ""
                                     },
@@ -324,50 +327,52 @@ fun BoardScreen(modifier: Modifier = Modifier) {
             title = { Text("Board Customization", color = Color.Black) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text("Select default post color:", color = Color.Black, fontWeight = FontWeight.Bold)
-                    
-                    val colorItems = listOf<String?>(null) + ownedColors.map { it.value }
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(4),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.height(110.dp)
+                        modifier = Modifier.heightIn(max = 400.dp)
                     ) {
-                        items(colorItems) { colorValue ->
-                            val color = if (colorValue == null) PostItCyan else {
-                                try { Color(android.graphics.Color.parseColor(colorValue)) } catch (e: Exception) { Color.Gray }
-                            }
+                        item(span = { GridItemSpan(4) }) {
+                            Text("Post Colors", color = Color.Black, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+                        }
+
+                        val colorItems = listOf<ShopItem?>(null) + ownedColors
+                        items(colorItems) { item ->
+                            val colorValue = item?.value
+                            val isSelected = pendingColor == colorValue
+                            val color = if (colorValue == null) PostItCyan else parseColorSafe(colorValue)
+                            
                             Box(
                                 modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(CircleShape)
+                                    .size(60.dp)
                                     .background(color)
                                     .clickable { pendingColor = colorValue }
                                     .handDrawnBorder(),
                                 contentAlignment = Alignment.Center
                             ) {
-                                if (pendingColor == colorValue) {
-                                    Box(modifier = Modifier.size(16.dp).clip(CircleShape).background(Color.Black))
+                                if (isSelected) {
+                                    Box(modifier = Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.2f)))
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
                                 }
                             }
                         }
-                    }
 
-                    Text("Select completion sticker:", color = Color.Black, fontWeight = FontWeight.Bold)
-                    
-                    val stickerItems = listOf<String?>(null) + ownedStickers.map { it.value }
-                    LazyVerticalGrid(
-                        columns = GridCells.Fixed(4),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.height(110.dp)
-                    ) {
-                        items(stickerItems) { url ->
+                        item(span = { GridItemSpan(4) }) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Completion Stickers", color = Color.Black, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+                        }
+
+                        val stickerItems = listOf<ShopItem?>(null) + ownedStickers
+                        items(stickerItems) { item ->
+                            val url = item?.value
+                            val isSelected = pendingSticker == url
+                            
                             Box(
                                 modifier = Modifier
-                                    .size(48.dp)
-                                    .clickable { pendingSticker = url }
-                                    .handDrawnBorder(),
+                                    .size(60.dp)
+                                    .handDrawnBorder()
+                                    .clickable { pendingSticker = url },
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (url == null) {
@@ -375,13 +380,13 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                                 } else {
                                     AsyncImage(
                                         model = url,
-                                        contentDescription = "Sticker preview",
+                                        contentDescription = null,
                                         modifier = Modifier.fillMaxSize().padding(4.dp)
                                     )
                                 }
-                                if (pendingSticker == url) {
+                                if (isSelected) {
                                     Box(modifier = Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.2f)))
-                                    Icon(Icons.Default.Contrast, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
                                 }
                             }
                         }
@@ -814,13 +819,21 @@ private fun PostCard(
                         model = stickerUrl,
                         contentDescription = "Completed Sticker",
                         modifier = Modifier
-                            .size(60.dp)
-                            .align(Alignment.CenterEnd)
-                            .padding(end = 32.dp),
+                            .size(100.dp)
+                            .align(Alignment.Center),
                         contentScale = ContentScale.Fit
                     )
                 }
             }
         }
+    }
+}
+
+fun parseColorSafe(colorString: String?): Color {
+    if (colorString == null) return Color.Gray
+    return try {
+        Color(android.graphics.Color.parseColor(colorString))
+    } catch (e: Exception) {
+        Color.Gray
     }
 }

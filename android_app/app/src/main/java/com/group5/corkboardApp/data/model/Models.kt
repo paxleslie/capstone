@@ -54,7 +54,8 @@ data class Post(
     val created_at: String? = null,
     val due_at: String? = null,
     val household_id: String,
-    val color: String? = null // Hex color or named color from shop
+    val color: String? = null, // Hex color or named color from shop
+    val sticker: String? = null // URL to completion sticker image
 )
 
 @Serializable

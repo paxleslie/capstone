@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -145,18 +146,78 @@ fun ShopScreen(modifier: Modifier = Modifier) {
                         
                         Spacer(modifier = Modifier.height(24.dp))
 
+                        val colorItems = state.items.filter { it.type == "color" }
+                        val stickerItems = state.items.filter { it.type == "sticker" }
+                        val otherItems = state.items.filter { it.type != "color" && it.type != "sticker" }
+
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(2),
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            items(state.items) { item ->
-                                ShopItemCard(
-                                    item = item,
-                                    isOwned = state.ownedItemIds.contains(item.id),
-                                    onBuy = { viewModel.buyItem(item) }
-                                )
+                            if (colorItems.isNotEmpty()) {
+                                item(span = { GridItemSpan(2) }) {
+                                    Text(
+                                        "Post Colors",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black,
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    )
+                                }
+                                items(colorItems) { item ->
+                                    ShopItemCard(
+                                        item = item,
+                                        isOwned = state.ownedItemIds.contains(item.id),
+                                        onBuy = { viewModel.buyItem(item) }
+                                    )
+                                }
+                            }
+
+                            if (stickerItems.isNotEmpty()) {
+                                item(span = { GridItemSpan(2) }) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        "Completion Stickers",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black,
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    )
+                                }
+                                items(stickerItems) { item ->
+                                    ShopItemCard(
+                                        item = item,
+                                        isOwned = state.ownedItemIds.contains(item.id),
+                                        onBuy = { viewModel.buyItem(item) }
+                                    )
+                                }
+                            }
+
+                            if (otherItems.isNotEmpty()) {
+                                item(span = { GridItemSpan(2) }) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        "Other Rewards",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black,
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    )
+                                }
+                                items(otherItems) { item ->
+                                    ShopItemCard(
+                                        item = item,
+                                        isOwned = state.ownedItemIds.contains(item.id),
+                                        onBuy = { viewModel.buyItem(item) }
+                                    )
+                                }
+                            }
+                            
+                            // Bottom spacer to ensure nothing is cut off
+                            item(span = { GridItemSpan(2) }) {
+                                Spacer(modifier = Modifier.height(80.dp))
                             }
                         }
                     }
