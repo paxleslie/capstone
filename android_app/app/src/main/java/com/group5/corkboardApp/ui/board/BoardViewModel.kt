@@ -120,7 +120,7 @@ class BoardViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    private suspend fun refreshDataForHousehold(userId: String, householdId: String) {
+    private fun refreshDataForHousehold(userId: String, householdId: String) {
         loadOwnedColors(userId, householdId)
     }
 
@@ -169,32 +169,19 @@ class BoardViewModel(application: Application) : AndroidViewModel(application) {
                 val userId = AuthRepository.currentUser()?.id
                     ?: throw Exception("User not authenticated")
                 
-                // 1. Fetch memberships first (source of truth for order)
-                // Use sortedBy so oldest first (smaller created_at is older)
-                val memberships = HouseholdRepository.getUserMemberships(userId)
-                    .sortedBy { it.created_at } 
-                
-                val householdIds = memberships.map { it.household_id }
-                if (householdIds.isEmpty()) {
-                    _householdLoadState.value = HouseholdLoadState.Success(emptyList())
-                    return@launch
-                }
-
-                // 2. Fetch household details
+                // 1. Fetch household details
                 val unsortedHouseholds = HouseholdRepository.getUserHouseholds(userId)
                 
-                // 3. Create correctly ordered list based on membership creation date
-                val sortedHouseholds = householdIds.mapNotNull { id ->
-                    unsortedHouseholds.find { it.household_id == id }
-                }
+                // 2. Create correctly ordered list based on created_at timestamp (oldest first)
+                val sortedHouseholds = unsortedHouseholds.sortedBy { it.created_at }
 
-                // 4. Atomic update of state to prevent flickering
+                // 3. Atomic update of state to prevent flickering
                 val currentState = _householdLoadState.value
                 if (currentState !is HouseholdLoadState.Success || currentState.households != sortedHouseholds) {
                     _householdLoadState.value = HouseholdLoadState.Success(sortedHouseholds)
                 }
                 
-                // 5. Sync selection and refresh relevant data
+                // 4. Sync selection and refresh relevant data
                 val currentHid = SessionManager.selectedHouseholdId.value
                 if (currentHid == null && sortedHouseholds.isNotEmpty()) {
                     selectHousehold(sortedHouseholds.first().household_id)
@@ -202,7 +189,7 @@ class BoardViewModel(application: Application) : AndroidViewModel(application) {
                     loadOwnedColors(userId, currentHid)
                 }
                 
-                loadPosts(householdIds)
+                loadPosts(sortedHouseholds.map { it.household_id })
             } catch (e: Exception) {
                 if (_householdLoadState.value !is HouseholdLoadState.Success) {
                     _householdLoadState.value = HouseholdLoadState.Error(

@@ -89,23 +89,11 @@ class ShopViewModel : ViewModel() {
             try {
                 val userId = AuthRepository.currentUser()?.id ?: throw Exception("Not logged in")
                 
-                // Fetch memberships and sort by created_at (join order)
-                val memberships = HouseholdRepository.getUserMemberships(userId)
-                    .sortedBy { it.created_at } // Oldest first (leftmost)
-                
-                val householdIds = memberships.map { it.household_id }
-                if (householdIds.isEmpty()) {
-                    _households.value = emptyList()
-                    return@launch
-                }
-
                 // Fetch households
                 val unsortedHouseholds = HouseholdRepository.getUserHouseholds(userId)
                 
-                // Re-sort based on membership order
-                val sortedHouseholds = householdIds.mapNotNull { id ->
-                    unsortedHouseholds.find { it.household_id == id }
-                }
+                // Lock the order by created_at (oldest first / leftmost)
+                val sortedHouseholds = unsortedHouseholds.sortedBy { it.created_at }
 
                 _households.value = sortedHouseholds
                 
