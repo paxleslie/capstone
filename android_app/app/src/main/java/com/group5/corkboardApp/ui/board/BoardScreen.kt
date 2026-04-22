@@ -56,6 +56,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -67,7 +68,9 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
 import com.group5.corkboardApp.data.model.Post
+import com.group5.corkboardApp.data.model.ShopItem
 import com.group5.corkboardApp.ui.theme.PostItCyan
 import com.group5.corkboardApp.ui.theme.handDrawnBorder
 
@@ -111,14 +114,16 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     val postActionState by viewModel.postActionState.collectAsState()
     val selectedHouseholdId by viewModel.selectedHouseholdId.collectAsState()
     val ownedColors by viewModel.ownedColors.collectAsState()
+    val ownedStickers by viewModel.ownedStickers.collectAsState()
     val defaultPostColor by viewModel.defaultPostColor.collectAsState()
+    val defaultStickerUrl by viewModel.defaultStickerUrl.collectAsState()
 
     LaunchedEffect(Unit) { viewModel.loadHouseholds() }
 
     val focusManager = LocalFocusManager.current
 
     var showCreateDialog by remember { mutableStateOf(false) }
-    var showColorDialog by remember { mutableStateOf(false) }
+    var showAssetDialog by remember { mutableStateOf(false) }
     var postToEdit by remember { mutableStateOf<Post?>(null) }
     var postToDelete by remember { mutableStateOf<Post?>(null) }
     var title by remember { mutableStateOf("") }
@@ -240,12 +245,12 @@ fun BoardScreen(modifier: Modifier = Modifier) {
             }
             
             IconButton(
-                onClick = { showColorDialog = true },
+                onClick = { showAssetDialog = true },
                 modifier = Modifier.padding(4.dp).handDrawnBorder(),
             ) {
                 Icon(
                     imageVector = Icons.Default.Contrast,
-                    contentDescription = "Default Post Color",
+                    contentDescription = "Post Style Settings",
                     tint = Color.Black
                 )
             }
@@ -267,10 +272,8 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                 }
                 is BoardViewModel.PostsLoadState.Success -> {
                     val visiblePosts = state.posts.filter { post ->
-                        val hidMatch = selectedHouseholdId == null || post.household_id == selectedHouseholdId
-                        // We now show completed chores as well
-                        hidMatch
-                    }.sortedBy { it.status == "completed" } // Put completed at the bottom if you want, or keep original order
+                        selectedHouseholdId == null || post.household_id == selectedHouseholdId
+                    }.sortedBy { it.status == "completed" }
 
                     if (visiblePosts.isNotEmpty()) {
                         LazyColumn(
@@ -283,6 +286,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                             items(visiblePosts, key = { it.post_id ?: it.hashCode() }) { post ->
                                 PostCard(
                                     post = post,
+                                    stickerUrl = defaultStickerUrl,
                                     onEdit = { 
                                         postToEdit = post 
                                         dueAt = post.due_at?.filter { it.isDigit() } ?: ""
@@ -311,42 +315,73 @@ fun BoardScreen(modifier: Modifier = Modifier) {
         }
     }
 
-    if (showColorDialog) {
+    if (showAssetDialog) {
         var pendingColor by remember { mutableStateOf(defaultPostColor) }
+        var pendingSticker by remember { mutableStateOf(defaultStickerUrl) }
 
         AlertDialog(
-            onDismissRequest = { showColorDialog = false },
-            title = { Text("Default Post Color", color = Color.Black) },
+            onDismissRequest = { showAssetDialog = false },
+            title = { Text("Board Customization", color = Color.Black) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Text("Select the default color for your new posts in this household:", color = Color.Black)
+                    Text("Select default post color:", color = Color.Black, fontWeight = FontWeight.Bold)
                     
-                    val allItems = listOf<String?>(null) + ownedColors.map { it.value }
-                    
+                    val colorItems = listOf<String?>(null) + ownedColors.map { it.value }
                     LazyVerticalGrid(
                         columns = GridCells.Fixed(4),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.height(200.dp) // Set a fixed height or use wrapContentHeight
+                        modifier = Modifier.height(110.dp)
                     ) {
-                        items(allItems) { colorValue ->
+                        items(colorItems) { colorValue ->
                             val color = if (colorValue == null) PostItCyan else {
                                 try { Color(android.graphics.Color.parseColor(colorValue)) } catch (e: Exception) { Color.Gray }
                             }
-                            
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
                                     .clip(CircleShape)
                                     .background(color)
-                                    .clickable { 
-                                        pendingColor = colorValue
-                                    }
+                                    .clickable { pendingColor = colorValue }
                                     .handDrawnBorder(),
                                 contentAlignment = Alignment.Center
                             ) {
                                 if (pendingColor == colorValue) {
                                     Box(modifier = Modifier.size(16.dp).clip(CircleShape).background(Color.Black))
+                                }
+                            }
+                        }
+                    }
+
+                    Text("Select completion sticker:", color = Color.Black, fontWeight = FontWeight.Bold)
+                    
+                    val stickerItems = listOf<String?>(null) + ownedStickers.map { it.value }
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(4),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.height(110.dp)
+                    ) {
+                        items(stickerItems) { url ->
+                            Box(
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .clickable { pendingSticker = url }
+                                    .handDrawnBorder(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (url == null) {
+                                    Text("None", style = MaterialTheme.typography.labelSmall)
+                                } else {
+                                    AsyncImage(
+                                        model = url,
+                                        contentDescription = "Sticker preview",
+                                        modifier = Modifier.fillMaxSize().padding(4.dp)
+                                    )
+                                }
+                                if (pendingSticker == url) {
+                                    Box(modifier = Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.2f)))
+                                    Icon(Icons.Default.Contrast, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.White)
                                 }
                             }
                         }
@@ -357,7 +392,8 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                 Button(
                     onClick = {
                         viewModel.setDefaultPostColor(pendingColor)
-                        showColorDialog = false
+                        viewModel.setDefaultStickerUrl(pendingSticker)
+                        showAssetDialog = false
                     },
                     modifier = Modifier.handDrawnBorder(),
                     shape = RoundedCornerShape(0.dp)
@@ -367,7 +403,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
             },
             dismissButton = {
                 Button(
-                    onClick = { showColorDialog = false },
+                    onClick = { showAssetDialog = false },
                     modifier = Modifier.handDrawnBorder(),
                     shape = RoundedCornerShape(0.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
@@ -665,6 +701,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
 @Composable
 private fun PostCard(
     post: Post,
+    stickerUrl: String? = null,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onComplete: () -> Unit
@@ -764,12 +801,25 @@ private fun PostCard(
             }
             
             if (isCompleted) {
-                // Gray film effect (optional, since we changed background color already)
+                // Gray film effect
                 Box(
                     modifier = Modifier
                         .matchParentSize()
                         .background(Color.Gray.copy(alpha = 0.2f))
                 )
+                
+                // Completion Sticker
+                if (stickerUrl != null) {
+                    AsyncImage(
+                        model = stickerUrl,
+                        contentDescription = "Completed Sticker",
+                        modifier = Modifier
+                            .size(60.dp)
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 32.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                }
             }
         }
     }

@@ -23,7 +23,7 @@ class BoardViewModel(application: Application) : AndroidViewModel(application) {
 
     private val prefs = application.getSharedPreferences("board_settings", Context.MODE_PRIVATE)
     private var loadHouseholdsJob: Job? = null
-    private var loadOwnedColorsJob: Job? = null
+    private var loadOwnedAssetsJob: Job? = null
 
     sealed class HouseholdLoadState {
         data object Loading : HouseholdLoadState()
@@ -65,8 +65,14 @@ class BoardViewModel(application: Application) : AndroidViewModel(application) {
     private val _ownedColors = MutableStateFlow<List<ShopItem>>(emptyList())
     val ownedColors: StateFlow<List<ShopItem>> = _ownedColors
 
+    private val _ownedStickers = MutableStateFlow<List<ShopItem>>(emptyList())
+    val ownedStickers: StateFlow<List<ShopItem>> = _ownedStickers
+
     private val _defaultPostColor = MutableStateFlow<String?>(null)
     val defaultPostColor: StateFlow<String?> = _defaultPostColor
+
+    private val _defaultStickerUrl = MutableStateFlow<String?>(null)
+    val defaultStickerUrl: StateFlow<String?> = _defaultStickerUrl
 
     private val universalItems = listOf(
         ShopItem(
@@ -105,8 +111,9 @@ class BoardViewModel(application: Application) : AndroidViewModel(application) {
                     val userId = AuthRepository.currentUser()?.id
                     if (userId != null) {
                         refreshDataForHousehold(userId, hid)
-                        // Load persisted default color for this household
+                        // Load persisted settings for this household
                         _defaultPostColor.value = prefs.getString("default_color_$hid", null)
+                        _defaultStickerUrl.value = prefs.getString("default_sticker_$hid", null)
                     }
                 }
                 // When household changes, refresh posts for all memberships
@@ -121,12 +128,12 @@ class BoardViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun refreshDataForHousehold(userId: String, householdId: String) {
-        loadOwnedColors(userId, householdId)
+        loadOwnedAssets(userId, householdId)
     }
 
-    private fun loadOwnedColors(userId: String, householdId: String) {
-        loadOwnedColorsJob?.cancel()
-        loadOwnedColorsJob = viewModelScope.launch {
+    private fun loadOwnedAssets(userId: String, householdId: String) {
+        loadOwnedAssetsJob?.cancel()
+        loadOwnedAssetsJob = viewModelScope.launch {
             try {
                 val memberships = HouseholdRepository.getUserMemberships(userId)
                 val member = memberships.find { it.household_id == householdId }
@@ -137,26 +144,30 @@ class BoardViewModel(application: Application) : AndroidViewModel(application) {
                     val allPossibleItems = dbItems + universalItems
                     val ownedNames = allPossibleItems.filter { it.id in ownedRewardIds }.map { it.name }.toSet()
 
-                    val newOwnedColors = allPossibleItems
-                        .filter { it.type == "color" }
+                    val ownedItems = allPossibleItems
                         .filter { item ->
                             item.id in ownedRewardIds || item.name in ownedNames
                         }
                         .distinctBy { it.name }
+
+                    val newOwnedColors = ownedItems
+                        .filter { it.type == "color" }
                         .map { item ->
                             if (item.value.startsWith("#") || item.value.length < 3) item 
                             else item.copy(value = "#${item.value}")
                         }
                     
-                    // Only update if changed to avoid unnecessary recompositions
-                    if (_ownedColors.value != newOwnedColors) {
-                        _ownedColors.value = newOwnedColors
-                        Log.d("BoardViewModel", "Updated owned colors: ${newOwnedColors.size}")
-                    }
+                    val newOwnedStickers = ownedItems
+                        .filter { it.type == "sticker" }
+
+                    _ownedColors.value = newOwnedColors
+                    _ownedStickers.value = newOwnedStickers
+                    Log.d("BoardViewModel", "Updated assets: colors=${newOwnedColors.size}, stickers=${newOwnedStickers.size}")
                 }
             } catch (e: Exception) {
-                Log.e("BoardViewModel", "Error loading owned colors", e)
+                Log.e("BoardViewModel", "Error loading owned assets", e)
                 _ownedColors.value = emptyList()
+                _ownedStickers.value = emptyList()
             }
         }
     }
@@ -186,7 +197,7 @@ class BoardViewModel(application: Application) : AndroidViewModel(application) {
                 if (currentHid == null && sortedHouseholds.isNotEmpty()) {
                     selectHousehold(sortedHouseholds.first().household_id)
                 } else if (currentHid != null) {
-                    loadOwnedColors(userId, currentHid)
+                    loadOwnedAssets(userId, currentHid)
                 }
                 
                 loadPosts(sortedHouseholds.map { it.household_id })
@@ -257,8 +268,13 @@ class BoardViewModel(application: Application) : AndroidViewModel(application) {
     fun setDefaultPostColor(color: String?) {
         val hid = selectedHouseholdId.value ?: return
         _defaultPostColor.value = color
-        // Save selection to SharedPreferences
         prefs.edit().putString("default_color_$hid", color).apply()
+    }
+
+    fun setDefaultStickerUrl(url: String?) {
+        val hid = selectedHouseholdId.value ?: return
+        _defaultStickerUrl.value = url
+        prefs.edit().putString("default_sticker_$hid", url).apply()
     }
 
     fun resetCreateState() {

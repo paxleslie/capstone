@@ -45,10 +45,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
 import com.group5.corkboardApp.data.model.ShopItem
 import com.group5.corkboardApp.ui.theme.CorkboardBackground
 import com.group5.corkboardApp.ui.theme.PostItMagenta
@@ -197,6 +199,14 @@ fun ShopItemCard(item: ShopItem, isOwned: Boolean, onBuy: () -> Unit) {
                                 .size(48.dp)
                                 .background(parseColorSafe(item.value))
                                 .border(1.dp, Color.Black)
+                        )
+                    }
+                    "sticker" -> {
+                        AsyncImage(
+                            model = item.value,
+                            contentDescription = item.name,
+                            modifier = Modifier.size(64.dp),
+                            contentScale = ContentScale.Fit
                         )
                     }
                     "icon" -> {
