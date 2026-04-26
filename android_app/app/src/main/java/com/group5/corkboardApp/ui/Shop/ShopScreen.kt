@@ -118,6 +118,15 @@ fun ShopScreen(modifier: Modifier = Modifier) {
                         CircularProgressIndicator(color = Color.Black)
                     }
                 }
+                is ShopViewModel.ShopState.NoHousehold -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "You are not in a household",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.Black
+                        )
+                    }
+                }
                 is ShopViewModel.ShopState.Error -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(text = state.message, color = Color.Red)
