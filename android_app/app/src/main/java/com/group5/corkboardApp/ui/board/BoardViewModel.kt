@@ -1,9 +1,7 @@
 package com.group5.corkboardApp.ui.board
 
-import android.app.Application
-import android.content.Context
 import android.util.Log
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.group5.corkboardApp.data.model.Household
 import com.group5.corkboardApp.data.model.Post
@@ -12,6 +10,7 @@ import com.group5.corkboardApp.data.repository.AuthRepository
 import com.group5.corkboardApp.data.repository.HouseholdRepository
 import com.group5.corkboardApp.data.repository.PostRepository
 import com.group5.corkboardApp.data.repository.ShopRepository
+import com.group5.corkboardApp.util.BoardPrefs
 import com.group5.corkboardApp.util.SessionManager
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -19,9 +18,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-class BoardViewModel(application: Application) : AndroidViewModel(application) {
+class BoardViewModel : ViewModel() {
 
-    private val prefs = application.getSharedPreferences("board_settings", Context.MODE_PRIVATE)
     private var loadHouseholdsJob: Job? = null
     private var loadOwnedAssetsJob: Job? = null
 
@@ -111,9 +109,8 @@ class BoardViewModel(application: Application) : AndroidViewModel(application) {
                     val userId = AuthRepository.currentUser()?.id
                     if (userId != null) {
                         refreshDataForHousehold(userId, hid)
-                        // Load persisted settings for this household
-                        _defaultPostColor.value = prefs.getString("default_color_$hid", null)
-                        _defaultStickerUrl.value = prefs.getString("default_sticker_$hid", null)
+                        _defaultPostColor.value = BoardPrefs.getDefaultColor(hid)
+                        _defaultStickerUrl.value = BoardPrefs.getDefaultSticker(hid)
                     }
                 }
                 // When household changes, refresh posts for all memberships
@@ -269,13 +266,13 @@ class BoardViewModel(application: Application) : AndroidViewModel(application) {
     fun setDefaultPostColor(color: String?) {
         val hid = selectedHouseholdId.value ?: return
         _defaultPostColor.value = color
-        prefs.edit().putString("default_color_$hid", color).apply()
+        BoardPrefs.setDefaultColor(hid, color)
     }
 
     fun setDefaultStickerUrl(url: String?) {
         val hid = selectedHouseholdId.value ?: return
         _defaultStickerUrl.value = url
-        prefs.edit().putString("default_sticker_$hid", url).apply()
+        BoardPrefs.setDefaultSticker(hid, url)
     }
 
     fun resetCreateState() {

@@ -5,6 +5,7 @@ import com.group5.corkboardApp.data.model.Post
 import com.group5.corkboardApp.data.repository.AuthRepository
 import com.group5.corkboardApp.data.repository.HouseholdRepository
 import com.group5.corkboardApp.data.repository.PostRepository
+import com.group5.corkboardApp.util.BoardPrefs
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -32,7 +33,7 @@ class BoardViewModelTest {
     @Before
     fun setup() {
         Dispatchers.setMain(testDispatcher)
-        mockkObject(AuthRepository, HouseholdRepository, PostRepository)
+        mockkObject(AuthRepository, HouseholdRepository, PostRepository, BoardPrefs)
 
         // Stub calls made during ViewModel init -> loadHouseholds()
         every { AuthRepository.currentUser() } returns mockk(relaxed = true) {
@@ -41,6 +42,9 @@ class BoardViewModelTest {
         coEvery { HouseholdRepository.getUserMemberships(any()) } returns emptyList()
         coEvery { HouseholdRepository.getUserHouseholds(any()) } returns emptyList()
         coEvery { PostRepository.getPostsForHouseholds(any()) } returns emptyList()
+
+        every { BoardPrefs.getDefaultColor(any()) } returns null
+        every { BoardPrefs.getDefaultSticker(any()) } returns null
 
         viewModel = BoardViewModel()
     }
