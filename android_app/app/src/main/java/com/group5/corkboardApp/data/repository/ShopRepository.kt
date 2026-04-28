@@ -5,6 +5,7 @@ import com.group5.corkboardApp.data.model.MemberReward
 import com.group5.corkboardApp.data.model.ShopItem
 import com.group5.corkboardApp.util.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
+import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.filter.FilterOperator
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -45,6 +46,24 @@ object ShopRepository {
                 .map { it.reward_id }
         } catch (e: Exception) {
             Log.e(TAG, "Error fetching owned items: ${e.message}")
+            emptyList()
+        }
+    }
+    
+    suspend fun getOwnedShopItems(memberId: String): List<ShopItem> {
+        return try {
+            val result = client.postgrest["member_rewards"]
+                .select(Columns.raw("*, rewards(*)")) {
+                    filter {
+                        eq("member_id", memberId)
+                    }
+                }
+                .decodeList<MemberReward>()
+                .mapNotNull { it.reward }
+            Log.d(TAG, "Fetched ${result.size} owned shop items")
+            result
+        } catch (e: Exception) {
+            Log.e(TAG, "Error fetching owned shop items: ${e.message}", e)
             emptyList()
         }
     }

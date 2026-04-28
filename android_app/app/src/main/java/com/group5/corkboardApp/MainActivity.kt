@@ -28,6 +28,7 @@ import com.group5.corkboardApp.ui.userProfile.UserProfileScreen
 import com.group5.corkboardApp.ui.message.MessageScreen
 import com.group5.corkboardApp.ui.Shop.ShopScreen
 import com.group5.corkboardApp.ui.theme.MyApplicationTheme
+import com.group5.corkboardApp.util.BoardPrefs
 import com.group5.corkboardApp.util.Constants
 import com.group5.corkboardApp.util.SupabaseClient
 import io.github.jan.supabase.auth.auth
@@ -36,6 +37,7 @@ import io.github.jan.supabase.auth.status.SessionStatus
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        BoardPrefs.init(this)
         enableEdgeToEdge()
         setContent {
             MyApplicationTheme {

@@ -88,19 +88,25 @@ class ShopViewModel : ViewModel() {
         viewModelScope.launch {
             try {
                 val userId = AuthRepository.currentUser()?.id ?: throw Exception("Not logged in")
-                val userHouseholds = HouseholdRepository.getUserHouseholds(userId)
-                _households.value = userHouseholds
                 
-                // If current selected ID is not in the new list, reset it
+                // Fetch households
+                val unsortedHouseholds = HouseholdRepository.getUserHouseholds(userId)
+                
+                // Lock the order by created_at (oldest first / leftmost)
+                val sortedHouseholds = unsortedHouseholds.sortedBy { it.created_at }
+
+                _households.value = sortedHouseholds
+                
+                // Handle selection sync
                 val currentId = SessionManager.selectedHouseholdId.value
-                if (currentId != null && userHouseholds.none { it.household_id == currentId }) {
-                    if (userHouseholds.isNotEmpty()) {
-                        selectHousehold(userHouseholds.first().household_id)
+                if (currentId != null && sortedHouseholds.none { it.household_id == currentId }) {
+                    if (sortedHouseholds.isNotEmpty()) {
+                        selectHousehold(sortedHouseholds.first().household_id)
                     } else {
                         SessionManager.selectHousehold(null)
                     }
-                } else if (currentId == null && userHouseholds.isNotEmpty()) {
-                    selectHousehold(userHouseholds.first().household_id)
+                } else if (currentId == null && sortedHouseholds.isNotEmpty()) {
+                    selectHousehold(sortedHouseholds.first().household_id)
                 }
             } catch (e: Exception) {
                 _shopState.value = ShopState.Error(e.localizedMessage ?: "Failed to load households")

@@ -27,6 +27,7 @@ data class HouseholdMember(
     val nickname: String? = null,
     val total_points: Int? = null,
     val weekly_points: Int? = null,
+    val created_at: String? = null,
     // the actual table is called users
     @SerialName("users")
     val profile: Profile? = null
@@ -53,7 +54,8 @@ data class Post(
     val created_at: String? = null,
     val due_at: String? = null,
     val household_id: String,
-    val color: String? = null // Hex color or named color from shop
+    val color: String? = null, // Hex color or named color from shop
+    val sticker: String? = null // URL to completion sticker image
 )
 
 @Serializable
@@ -73,5 +75,7 @@ data class MemberReward(
     val id: String? = null,
     val member_id: String,
     val reward_id: String,
-    val note: String? = null
+    val note: String? = null,
+    @SerialName("rewards")
+    val reward: ShopItem? = null
 )

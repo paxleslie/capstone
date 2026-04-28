@@ -166,8 +166,12 @@ class HouseholdViewModel : ViewModel() {
                     _householdListState.value = HouseholdListState.Error("User not authenticated")
                     return@launch
                 }
-                val households = HouseholdRepository.getUserHouseholds(userId)
-                _householdListState.value = HouseholdListState.Success(households)
+                val unsortedHouseholds = HouseholdRepository.getUserHouseholds(userId)
+                
+                // Sort households by created_at (oldest first) so new ones appear at the bottom/right
+                val sortedHouseholds = unsortedHouseholds.sortedBy { it.created_at }
+                
+                _householdListState.value = HouseholdListState.Success(sortedHouseholds)
             } catch (e: Exception) {
                 _householdListState.value = HouseholdListState.Error(e.localizedMessage ?: "Failed to fetch households")
             }

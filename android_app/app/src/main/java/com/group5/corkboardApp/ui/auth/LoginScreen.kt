@@ -9,9 +9,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -66,6 +68,18 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToSignup: () -> Unit) {
         }
     }
 
+    val blackTextFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = Color.Black,
+        unfocusedTextColor = Color.Black,
+        focusedLabelColor = Color.Black,
+        unfocusedLabelColor = Color.Black,
+        cursorColor = Color.Black,
+        focusedPlaceholderColor = Color.Gray,
+        unfocusedPlaceholderColor = Color.Gray,
+        focusedBorderColor = Color.Black,
+        unfocusedBorderColor = Color.Black
+    )
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -73,7 +87,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToSignup: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(text = "Login", style = MaterialTheme.typography.headlineMedium)
+        Text(text = "Login", style = MaterialTheme.typography.headlineMedium, color = Color.Black)
         Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
@@ -88,7 +102,8 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToSignup: () -> Unit) {
                 onNext = { focusManager.moveFocus(FocusDirection.Down) }
             ),
             singleLine = true,
-            enabled = !isLoading
+            enabled = !isLoading,
+            colors = blackTextFieldColors
         )
         Spacer(modifier = Modifier.height(8.dp))
         OutlinedTextField(
@@ -107,7 +122,8 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToSignup: () -> Unit) {
                 }
             ),
             singleLine = true,
-            enabled = !isLoading
+            enabled = !isLoading,
+            colors = blackTextFieldColors
         )
 
         errorText?.let {
@@ -116,12 +132,23 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToSignup: () -> Unit) {
         }
 
         Spacer(modifier = Modifier.height(16.dp))
-        Button(onClick = { onLoginClick() }, enabled = !isLoading) {
-            if (isLoading) CircularProgressIndicator() else Text("Login")
+        Button(
+            onClick = { onLoginClick() }, 
+            enabled = !isLoading,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.Black,
+                contentColor = Color.White
+            )
+        ) {
+            if (isLoading) CircularProgressIndicator(color = Color.White) else Text("Login")
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-        TextButton(onClick = onNavigateToSignup, enabled = !isLoading) {
+        TextButton(
+            onClick = onNavigateToSignup, 
+            enabled = !isLoading,
+            colors = ButtonDefaults.textButtonColors(contentColor = Color.Black)
+        ) {
             Text("Don't have an account? Sign Up")
         }
     }
