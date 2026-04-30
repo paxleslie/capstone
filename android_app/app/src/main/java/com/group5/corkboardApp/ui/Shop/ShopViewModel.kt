@@ -18,6 +18,7 @@ class ShopViewModel : ViewModel() {
 
     sealed class ShopState {
         data object Loading : ShopState()
+        data object NoHousehold : ShopState()
         data class Success(
             val items: List<ShopItem>,
             val ownedItemIds: List<String>,
@@ -73,7 +74,7 @@ class ShopViewModel : ViewModel() {
                 if (id != null) {
                     loadShopData()
                 } else {
-                    _shopState.value = ShopState.Loading
+                    _shopState.value = ShopState.NoHousehold
                     _households.value = emptyList()
                 }
             }

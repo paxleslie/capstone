@@ -145,7 +145,7 @@ fun LoginScreen(onLoginSuccess: () -> Unit, onNavigateToSignup: () -> Unit) {
 
         Spacer(modifier = Modifier.height(8.dp))
         TextButton(
-            onClick = onNavigateToSignup, 
+            onClick = onNavigateToSignup,
             enabled = !isLoading,
             colors = ButtonDefaults.textButtonColors(contentColor = Color.Black)
         ) {

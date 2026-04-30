@@ -289,7 +289,7 @@ fun SignupScreen(onSignupSuccess: () -> Unit, onBackToLogin: () -> Unit) {
 
         Spacer(modifier = Modifier.height(8.dp))
         TextButton(
-            onClick = onBackToLogin, 
+            onClick = onBackToLogin,
             enabled = !isLoading,
             colors = ButtonDefaults.textButtonColors(contentColor = Color.Black)
         ) {
