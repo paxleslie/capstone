@@ -3,12 +3,8 @@ package com.group5.corkboardApp.ui.message
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.group5.corkboardApp.util.SupabaseClient
 import com.group5.corkboardApp.data.repository.MessageRepository
-import io.github.jan.supabase.auth.auth
-import io.github.jan.supabase.postgrest.postgrest
-import io.github.jan.supabase.postgrest.query.Columns
-import io.github.jan.supabase.postgrest.rpc
+import com.group5.corkboardApp.util.SupabaseClient
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch

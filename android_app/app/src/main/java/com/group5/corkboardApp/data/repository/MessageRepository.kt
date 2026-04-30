@@ -4,7 +4,6 @@ import com.group5.corkboardApp.ui.message.Message
 import com.group5.corkboardApp.util.SupabaseClient
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
-import io.github.jan.supabase.postgrest.rpc
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
