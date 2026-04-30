@@ -6,6 +6,14 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
+val localProperties = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) load(f.inputStream())
+}
+
+fun secret(name: String): String? =
+    System.getenv(name) ?: localProperties.getProperty(name)
+
 android {
     namespace = "com.group5.corkboardApp"
     compileSdk = 36
@@ -18,14 +26,21 @@ android {
         versionName = "1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        
-        val localProperties = Properties()
-        val localPropertiesFile = rootProject.file("local.properties")
-        if (localPropertiesFile.exists()) {
-            localProperties.load(localPropertiesFile.inputStream())
-        }
+
         buildConfigField("String", "SUPABASE_URL", "${localProperties.getProperty("SUPABASE_URL")}")
         buildConfigField("String", "SUPABASE_KEY", "${localProperties.getProperty("SUPABASE_KEY")}")
+    }
+
+    signingConfigs {
+        create("release") {
+            val keystorePath = secret("KEYSTORE_PATH")
+            if (keystorePath != null) {
+                storeFile = file(keystorePath)
+                storePassword = secret("KEYSTORE_PASSWORD")
+                keyAlias = secret("KEY_ALIAS")
+                keyPassword = secret("KEY_PASSWORD")
+            }
+        }
     }
 
     buildTypes {
@@ -35,6 +50,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfigs.getByName("release").storeFile?.let {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {
