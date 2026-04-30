@@ -38,6 +38,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.group5.corkboardApp.data.model.Household
 import com.group5.corkboardApp.data.repository.AuthRepository
@@ -61,6 +63,14 @@ fun MessageScreen(modifier: Modifier = Modifier) {
     var messageText by remember { mutableStateOf("") }
 
     val focusManager = LocalFocusManager.current
+
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
 
     // Load households for the top tab row
     LaunchedEffect(Unit) {
@@ -153,6 +163,7 @@ fun MessageScreen(modifier: Modifier = Modifier) {
 
         // Message list
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .weight(1f)
                 .fillMaxWidth(),
