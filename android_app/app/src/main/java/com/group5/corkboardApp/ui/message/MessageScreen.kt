@@ -18,14 +18,21 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.IconButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -167,11 +174,23 @@ fun MessageScreen(modifier: Modifier = Modifier) {
             items(messages, key = { it.message_id }) { message ->
                 MessageItem(
                     message = message,
-                    currentMemberId = currentMemberId!!
+                    currentMemberId = currentMemberId!!,
+                    onDelete = {
+                        viewModel.deleteMessage(
+                            messageId = message.message_id,
+                            householdId = selectedHouseholdId!!
+                        )
+                    },
+                    onEdit = { newContent ->
+                        viewModel.editMessage(
+                            messageId = message.message_id,
+                            householdId = selectedHouseholdId!!,
+                            newContent = newContent
+                        )
+                    }
                 )
             }
         }
-
         Spacer(modifier = Modifier.height(8.dp))
 
         // Message input row
@@ -234,29 +253,27 @@ fun MessageScreen(modifier: Modifier = Modifier) {
 @Composable
 fun MessageItem(
     message: Message,
-    currentMemberId: String
+    currentMemberId: String,
+    onDelete: () -> Unit,
+    onEdit: (String) -> Unit
 ) {
     val isOwnMessage = message.from_member_id == currentMemberId
+
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var showEditDialog by remember { mutableStateOf(false) }
+    var editedText by remember { mutableStateOf(message.content) }
 
     val senderName = if (isOwnMessage) {
         "You"
     } else {
         message.senderMember?.nickname?.takeIf { it.isNotBlank() }
-            ?: message.senderMember?.role?.takeIf { it.isNotBlank() }
+            ?: message.senderMember?.user?.display_name?.takeIf { it.isNotBlank() }
+            ?: message.senderMember?.user?.name?.takeIf { it.isNotBlank() }
             ?: "User"
     }
 
-    val bubbleColor = if (isOwnMessage) {
-        Color(0xFFD1C4E9)
-    } else {
-        Color.White
-    }
-
-    val rowArrangement = if (isOwnMessage) {
-        Arrangement.End
-    } else {
-        Arrangement.Start
-    }
+    val bubbleColor = if (isOwnMessage) Color(0xFFD1C4E9) else Color.White
+    val rowArrangement = if (isOwnMessage) Arrangement.End else Arrangement.Start
 
     Row(
         modifier = Modifier.fillMaxWidth(),
@@ -269,9 +286,7 @@ fun MessageItem(
             shape = RoundedCornerShape(0.dp),
             color = bubbleColor
         ) {
-            Column(
-                modifier = Modifier.padding(8.dp)
-            ) {
+            Column(modifier = Modifier.padding(8.dp)) {
                 Text(
                     text = senderName,
                     style = MaterialTheme.typography.labelMedium
@@ -283,11 +298,98 @@ fun MessageItem(
                 )
 
                 Text(
-                    text = formatMessageTime(message.sent_at),
+                    text = if (message.edited_at != null) {
+                        "Edited ${formatMessageTime(message.edited_at)}"
+                    } else {
+                        formatMessageTime(message.sent_at)
+                    },
                     style = MaterialTheme.typography.bodySmall
                 )
+
+                if (isOwnMessage) {
+                    Row {
+                        IconButton(onClick = { showEditDialog = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = "Edit message"
+                            )
+                        }
+
+                        IconButton(onClick = { showDeleteDialog = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = "Delete message",
+                                tint = Color.Red
+                            )
+                        }
+                    }
+                }
             }
         }
+    }
+
+    if (showEditDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                editedText = message.content
+                showEditDialog = false
+            },
+            title = { Text("Edit message") },
+            text = {
+                OutlinedTextField(
+                    value = editedText,
+                    onValueChange = { editedText = it },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (editedText.isNotBlank()) {
+                            showEditDialog = false
+                            onEdit(editedText.trim())
+                        }
+                    }
+                ) {
+                    Text("Save", color = Color(0xFF1976D2))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        editedText = message.content
+                        showEditDialog = false
+                    }
+                ) {
+                    Text("Cancel", color = Color(0xFF1976D2))
+                }
+            }
+        )
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDialog = false },
+            title = { Text("Delete message?") },
+            text = { Text("This cannot be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteDialog = false
+                        onDelete()
+                    }
+                ) {
+                    Text("Delete", color = Color.Red)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { showDeleteDialog = false }
+                ) {
+                    Text("Cancel", color = Color(0xFF1976D2))
+                }
+            }
+        )
     }
 }
 

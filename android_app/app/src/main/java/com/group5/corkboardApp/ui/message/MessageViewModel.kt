@@ -19,6 +19,7 @@ data class Message(
     val from_member_id: String,
     val content: String,
     val sent_at: String,
+    val edited_at: String? = null,
 
     // Joined household_members row so we can display nickname/role
     @SerialName("household_members")
@@ -30,7 +31,17 @@ data class Message(
 data class SenderMember(
     val member_id: String,
     val nickname: String? = null,
-    val role: String? = null
+    val user_id: String? = null,
+    val role: String? = null,
+
+    @SerialName("user")
+    val user: SenderUser? = null
+)
+
+@Serializable
+data class SenderUser(
+    val display_name: String? = null,
+    val name: String? = null
 )
 
 // Used to get member IDs for a household
@@ -88,6 +99,43 @@ class MessageViewModel : ViewModel() {
             } catch (e: Exception) {
                 Log.e(TAG, "Send failed", e)
                 _errorMessage.value = e.localizedMessage ?: "Failed to send message"
+            }
+        }
+    }
+
+    // Edit message through database function
+    fun editMessage(messageId: String, householdId: String, newContent: String) {
+        viewModelScope.launch {
+            try {
+                _errorMessage.value = null
+
+                MessageRepository.editMessage(
+                    messageId = messageId,
+                    newContent = newContent
+                )
+
+                fetchMessages(householdId)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Edit failed", e)
+                _errorMessage.value = e.localizedMessage ?: "Failed to edit message"
+            }
+        }
+    }
+
+    // Delete message using database function
+    fun deleteMessage(messageId: String, householdId: String) {
+        viewModelScope.launch {
+            try {
+                _errorMessage.value = null
+
+                MessageRepository.deleteMessage(messageId)
+
+                fetchMessages(householdId)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "Delete failed", e)
+                _errorMessage.value = e.localizedMessage ?: "Failed to delete message"
             }
         }
     }
