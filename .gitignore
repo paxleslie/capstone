@@ -1,3 +1,16 @@
+# Secrets
+capstone_token
+
+# Internal project documents
+project_reports/
+
+# Node / Supabase CLI
+node_modules/
+package-lock.json
+
+# Downloaded CI logs
+logs_*/
+
 # Gradle files
 .gradle/
 build/
@@ -26,6 +39,7 @@ render.experimental.xml
 # Keystore files
 *.jks
 *.keystore
+*.b64
 
 # Google Services (e.g. APIs or Firebase)
 google-services.json

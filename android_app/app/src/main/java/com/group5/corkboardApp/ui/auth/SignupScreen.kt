@@ -13,9 +13,11 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -129,6 +131,18 @@ fun SignupScreen(onSignupSuccess: () -> Unit, onBackToLogin: () -> Unit) {
         )
     }
 
+    val blackTextFieldColors = OutlinedTextFieldDefaults.colors(
+        focusedTextColor = Color.Black,
+        unfocusedTextColor = Color.Black,
+        focusedLabelColor = Color.Black,
+        unfocusedLabelColor = Color.Black,
+        cursorColor = Color.Black,
+        focusedPlaceholderColor = Color.Gray,
+        unfocusedPlaceholderColor = Color.Gray,
+        focusedBorderColor = Color.Black,
+        unfocusedBorderColor = Color.Black
+    )
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -137,7 +151,7 @@ fun SignupScreen(onSignupSuccess: () -> Unit, onBackToLogin: () -> Unit) {
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(text = "Create Account", style = MaterialTheme.typography.headlineMedium)
+        Text(text = "Create Account", style = MaterialTheme.typography.headlineMedium, color = Color.Black)
         Spacer(modifier = Modifier.height(16.dp))
 
         OutlinedTextField(
@@ -148,7 +162,8 @@ fun SignupScreen(onSignupSuccess: () -> Unit, onBackToLogin: () -> Unit) {
             singleLine = true,
             enabled = !isLoading,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+            colors = blackTextFieldColors
         )
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -160,7 +175,8 @@ fun SignupScreen(onSignupSuccess: () -> Unit, onBackToLogin: () -> Unit) {
             singleLine = true,
             enabled = !isLoading,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
-            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+            colors = blackTextFieldColors
         )
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -176,7 +192,8 @@ fun SignupScreen(onSignupSuccess: () -> Unit, onBackToLogin: () -> Unit) {
             keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
             modifier = Modifier.fillMaxWidth(),
             singleLine = true,
-            enabled = !isLoading
+            enabled = !isLoading,
+            colors = blackTextFieldColors
         )
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -188,7 +205,8 @@ fun SignupScreen(onSignupSuccess: () -> Unit, onBackToLogin: () -> Unit) {
             singleLine = true,
             enabled = !isLoading,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
-            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+            colors = blackTextFieldColors
         )
         Spacer(modifier = Modifier.height(16.dp))
 
@@ -196,12 +214,14 @@ fun SignupScreen(onSignupSuccess: () -> Unit, onBackToLogin: () -> Unit) {
             Text(
                 text = "Password Rules:",
                 style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
             )
             Text(
                 text = "• At least 6 characters\n• At least one letter\n• At least one number",
                 style = MaterialTheme.typography.labelSmall,
-                modifier = Modifier.padding(bottom = 8.dp)
+                modifier = Modifier.padding(bottom = 8.dp),
+                color = Color.Black
             )
         }
 
@@ -214,7 +234,8 @@ fun SignupScreen(onSignupSuccess: () -> Unit, onBackToLogin: () -> Unit) {
             singleLine = true,
             enabled = !isLoading,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password, imeAction = ImeAction.Next),
-            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) })
+            keyboardActions = KeyboardActions(onNext = { focusManager.moveFocus(FocusDirection.Down) }),
+            colors = blackTextFieldColors
         )
         Spacer(modifier = Modifier.height(8.dp))
 
@@ -232,7 +253,8 @@ fun SignupScreen(onSignupSuccess: () -> Unit, onBackToLogin: () -> Unit) {
                     focusManager.clearFocus()
                     handleSignup()
                 }
-            })
+            }),
+            colors = blackTextFieldColors
         )
 
         if (password.isNotEmpty() && confirmPassword.isNotEmpty() && !passwordsMatch) {
@@ -256,13 +278,21 @@ fun SignupScreen(onSignupSuccess: () -> Unit, onBackToLogin: () -> Unit) {
                 handleSignup()
             },
             modifier = Modifier.fillMaxWidth(),
-            enabled = canSubmit && !isLoading
+            enabled = canSubmit && !isLoading,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = Color.Black,
+                contentColor = Color.White
+            )
         ) {
-            if (isLoading) CircularProgressIndicator() else Text("Sign Up")
+            if (isLoading) CircularProgressIndicator(color = Color.White) else Text("Sign Up")
         }
 
         Spacer(modifier = Modifier.height(8.dp))
-        TextButton(onClick = onBackToLogin, enabled = !isLoading) {
+        TextButton(
+            onClick = onBackToLogin,
+            enabled = !isLoading,
+            colors = ButtonDefaults.textButtonColors(contentColor = Color.Black)
+        ) {
             Text("Already have an account? Log In")
         }
     }

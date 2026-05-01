@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
@@ -45,10 +46,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
 import com.group5.corkboardApp.data.model.ShopItem
 import com.group5.corkboardApp.ui.theme.CorkboardBackground
 import com.group5.corkboardApp.ui.theme.PostItMagenta
@@ -115,6 +118,15 @@ fun ShopScreen(modifier: Modifier = Modifier) {
                         CircularProgressIndicator(color = Color.Black)
                     }
                 }
+                is ShopViewModel.ShopState.NoHousehold -> {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "You are not in a household",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = Color.Black
+                        )
+                    }
+                }
                 is ShopViewModel.ShopState.Error -> {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(text = state.message, color = Color.Red)
@@ -143,18 +155,78 @@ fun ShopScreen(modifier: Modifier = Modifier) {
                         
                         Spacer(modifier = Modifier.height(24.dp))
 
+                        val colorItems = state.items.filter { it.type == "color" }
+                        val stickerItems = state.items.filter { it.type == "sticker" }
+                        val otherItems = state.items.filter { it.type != "color" && it.type != "sticker" }
+
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(2),
                             horizontalArrangement = Arrangement.spacedBy(16.dp),
                             verticalArrangement = Arrangement.spacedBy(16.dp),
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            items(state.items) { item ->
-                                ShopItemCard(
-                                    item = item,
-                                    isOwned = state.ownedItemIds.contains(item.id),
-                                    onBuy = { viewModel.buyItem(item) }
-                                )
+                            if (colorItems.isNotEmpty()) {
+                                item(span = { GridItemSpan(2) }) {
+                                    Text(
+                                        "Post Colors",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black,
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    )
+                                }
+                                items(colorItems) { item ->
+                                    ShopItemCard(
+                                        item = item,
+                                        isOwned = state.ownedItemIds.contains(item.id),
+                                        onBuy = { viewModel.buyItem(item) }
+                                    )
+                                }
+                            }
+
+                            if (stickerItems.isNotEmpty()) {
+                                item(span = { GridItemSpan(2) }) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        "Completion Stickers",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black,
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    )
+                                }
+                                items(stickerItems) { item ->
+                                    ShopItemCard(
+                                        item = item,
+                                        isOwned = state.ownedItemIds.contains(item.id),
+                                        onBuy = { viewModel.buyItem(item) }
+                                    )
+                                }
+                            }
+
+                            if (otherItems.isNotEmpty()) {
+                                item(span = { GridItemSpan(2) }) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        "Other Rewards",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black,
+                                        modifier = Modifier.padding(vertical = 8.dp)
+                                    )
+                                }
+                                items(otherItems) { item ->
+                                    ShopItemCard(
+                                        item = item,
+                                        isOwned = state.ownedItemIds.contains(item.id),
+                                        onBuy = { viewModel.buyItem(item) }
+                                    )
+                                }
+                            }
+                            
+                            // Bottom spacer to ensure nothing is cut off
+                            item(span = { GridItemSpan(2) }) {
+                                Spacer(modifier = Modifier.height(80.dp))
                             }
                         }
                     }
@@ -197,6 +269,14 @@ fun ShopItemCard(item: ShopItem, isOwned: Boolean, onBuy: () -> Unit) {
                                 .size(48.dp)
                                 .background(parseColorSafe(item.value))
                                 .border(1.dp, Color.Black)
+                        )
+                    }
+                    "sticker" -> {
+                        AsyncImage(
+                            model = item.value,
+                            contentDescription = item.name,
+                            modifier = Modifier.size(64.dp),
+                            contentScale = ContentScale.Fit
                         )
                     }
                     "icon" -> {

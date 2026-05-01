@@ -7,13 +7,19 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -23,6 +29,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Contrast
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.AlertDialog
@@ -30,16 +38,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.LargeFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -56,6 +61,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -64,9 +71,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
 import com.group5.corkboardApp.data.model.Post
+import com.group5.corkboardApp.data.model.ShopItem
 import com.group5.corkboardApp.ui.theme.PostItCyan
 import com.group5.corkboardApp.ui.theme.handDrawnBorder
 
@@ -110,12 +120,17 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     val postActionState by viewModel.postActionState.collectAsState()
     val selectedHouseholdId by viewModel.selectedHouseholdId.collectAsState()
     val ownedColors by viewModel.ownedColors.collectAsState()
+    val ownedStickers by viewModel.ownedStickers.collectAsState()
+    val defaultPostColor by viewModel.defaultPostColor.collectAsState()
+    val defaultStickerUrl by viewModel.defaultStickerUrl.collectAsState()
 
     LaunchedEffect(Unit) { viewModel.loadHouseholds() }
 
     val focusManager = LocalFocusManager.current
+    val isTablet = LocalConfiguration.current.smallestScreenWidthDp >= 600
 
     var showCreateDialog by remember { mutableStateOf(false) }
+    var showAssetDialog by remember { mutableStateOf(false) }
     var postToEdit by remember { mutableStateOf<Post?>(null) }
     var postToDelete by remember { mutableStateOf<Post?>(null) }
     var title by remember { mutableStateOf("") }
@@ -123,12 +138,9 @@ fun BoardScreen(modifier: Modifier = Modifier) {
     var selectedType by remember { mutableStateOf("note") }
     var pointValue by remember { mutableStateOf("") }
     var dueAt by remember { mutableStateOf("") }
-    var selectedColor by remember { mutableStateOf<String?>(null) }
-    var householdDropdownExpanded by remember { mutableStateOf(false) }
     var errorText by remember { mutableStateOf<String?>(null) }
 
     val households = (householdLoadState as? BoardViewModel.HouseholdLoadState.Success)?.households ?: emptyList()
-    val selectedHousehold = households.find { it.household_id == selectedHouseholdId }
 
     LaunchedEffect(createPostState) {
         when (val state = createPostState) {
@@ -139,7 +151,6 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                 selectedType = "note"
                 pointValue = ""
                 dueAt = ""
-                selectedColor = null
                 errorText = null
                 viewModel.resetCreateState()
             }
@@ -168,7 +179,6 @@ fun BoardScreen(modifier: Modifier = Modifier) {
         selectedType = "note"
         pointValue = ""
         dueAt = ""
-        selectedColor = null
         errorText = null
         viewModel.resetCreateState()
     }
@@ -178,7 +188,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
         if (title.isBlank()) {
             errorText = "Please enter a title"
         } else if (hid == null) {
-            errorText = "Please select a household"
+            errorText = "Please select a household first"
         } else {
             val formattedDate = if (dueAt.length == 8) {
                 "${dueAt.substring(4, 8)}-${dueAt.substring(0, 2)}-${dueAt.substring(2, 4)}"
@@ -191,7 +201,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                 householdId = hid,
                 pointValue = pointValue.toIntOrNull(),
                 dueAt = formattedDate,
-                color = selectedColor
+                color = null // Will use defaultPostColor from ViewModel
             )
         }
     }
@@ -206,30 +216,50 @@ fun BoardScreen(modifier: Modifier = Modifier) {
         unfocusedLabelColor = Color.Black,
         cursorColor = Color.Black,
         focusedPlaceholderColor = Color.Gray,
-        unfocusedPlaceholderColor = Color.Gray
+        unfocusedPlaceholderColor = Color.Gray,
+        focusedBorderColor = Color.Black,
+        unfocusedBorderColor = Color.Black
     )
 
     Column(modifier = modifier.fillMaxSize()) {
-        if (households.isNotEmpty()) {
-            LazyRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    horizontal = 16.dp, vertical = 8.dp
-                )
-            ) {
-                items(households, key = { it.household_id }) { household ->
-                    FilterChip(
-                        selected = household.household_id == selectedHouseholdId,
-                        onClick = { viewModel.selectHousehold(household.household_id) },
-                        label = { Text(household.household_name, color = Color.Black) },
-                        modifier = Modifier.handDrawnBorder(),
-                        shape = RoundedCornerShape(0.dp),
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = Color(0xFFD1C4E9), // Matching light purple
-                            containerColor = Color.White
-                        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            if (households.isNotEmpty()) {
+                LazyRow(
+                    modifier = Modifier.weight(1f),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                        horizontal = 16.dp, vertical = 8.dp
                     )
+                ) {
+                    items(households, key = { it.household_id }) { household ->
+                        FilterChip(
+                            selected = household.household_id == selectedHouseholdId,
+                            onClick = { viewModel.selectHousehold(household.household_id) },
+                            label = { Text(household.household_name, color = Color.Black) },
+                            modifier = Modifier.handDrawnBorder(),
+                            shape = RoundedCornerShape(0.dp),
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = Color(0xFFD1C4E9), // Matching light purple
+                                containerColor = Color.White
+                            )
+                        )
+                    }
                 }
+            }
+            
+            IconButton(
+                onClick = { showAssetDialog = true },
+                modifier = Modifier.padding(4.dp).handDrawnBorder(),
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Contrast,
+                    contentDescription = "Post Style Settings",
+                    tint = Color.Black
+                )
             }
         }
 
@@ -249,48 +279,189 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                 }
                 is BoardViewModel.PostsLoadState.Success -> {
                     val visiblePosts = state.posts.filter { post ->
-                        val hidMatch = selectedHouseholdId == null || post.household_id == selectedHouseholdId
-                        val isActive = post.type == "note" || post.status == "pending"
-                        hidMatch && isActive
-                    }
+                        selectedHouseholdId == null || post.household_id == selectedHouseholdId
+                    }.sortedBy { it.status == "completed" }
 
                     if (visiblePosts.isNotEmpty()) {
-                        LazyColumn(
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                                start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp
-                            ),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            items(visiblePosts, key = { it.post_id ?: it.hashCode() }) { post ->
-                                PostCard(
-                                    post = post,
-                                    onEdit = { 
-                                        postToEdit = post 
-                                        dueAt = post.due_at?.filter { it.isDigit() } ?: ""
-                                    },
-                                    onDelete = { postToDelete = post },
-                                    onComplete = { viewModel.completeChore(post) }
-                                )
+                        if (isTablet) {
+                            LazyVerticalGrid(
+                                columns = GridCells.Fixed(4),
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                    start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp
+                                ),
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(visiblePosts, key = { it.post_id ?: it.hashCode() }) { post ->
+                                    PostCard(
+                                        post = post,
+                                        stickerUrl = post.sticker,
+                                        isTablet = true,
+                                        onEdit = {
+                                            postToEdit = post
+                                            dueAt = post.due_at?.filter { it.isDigit() } ?: ""
+                                        },
+                                        onDelete = { postToDelete = post },
+                                        onComplete = { viewModel.completeChore(post) }
+                                    )
+                                }
+                            }
+                        } else {
+                            LazyColumn(
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                                    start = 16.dp, end = 16.dp, top = 16.dp, bottom = 88.dp
+                                ),
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                items(visiblePosts, key = { it.post_id ?: it.hashCode() }) { post ->
+                                    PostCard(
+                                        post = post,
+                                        stickerUrl = post.sticker,
+                                        onEdit = {
+                                            postToEdit = post
+                                            dueAt = post.due_at?.filter { it.isDigit() } ?: ""
+                                        },
+                                        onDelete = { postToDelete = post },
+                                        onComplete = { viewModel.completeChore(post) }
+                                    )
+                                }
                             }
                         }
                     }
                 }
             }
 
-            FloatingActionButton(
-                onClick = { showCreateDialog = true },
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(16.dp)
-                    .handDrawnBorder(),
-                shape = RoundedCornerShape(0.dp),
-                containerColor = Color.White,
-                contentColor = Color.Black
-            ) {
-                Icon(Icons.Default.Add, contentDescription = "Create post")
+            if (isTablet) {
+                LargeFloatingActionButton(
+                    onClick = { showCreateDialog = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp)
+                        .handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp),
+                    containerColor = if (defaultPostColor == null) Color.White else parseColorSafe(defaultPostColor),
+                    contentColor = Color.Black
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Create post", modifier = Modifier.size(36.dp))
+                }
+            } else {
+                FloatingActionButton(
+                    onClick = { showCreateDialog = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(16.dp)
+                        .handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp),
+                    containerColor = if (defaultPostColor == null) Color.White else parseColorSafe(defaultPostColor),
+                    contentColor = Color.Black
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "Create post")
+                }
             }
         }
+    }
+
+    if (showAssetDialog) {
+        var pendingColor by remember { mutableStateOf(defaultPostColor) }
+        var pendingSticker by remember { mutableStateOf(defaultStickerUrl) }
+
+        AlertDialog(
+            onDismissRequest = { showAssetDialog = false },
+            title = { Text("Board Customization", color = Color.Black) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(4),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.heightIn(max = 400.dp)
+                    ) {
+                        item(span = { GridItemSpan(4) }) {
+                            Text("Post Colors", color = Color.Black, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+                        }
+
+                        val colorItems = listOf<ShopItem?>(null) + ownedColors
+                        items(colorItems) { item ->
+                            val colorValue = item?.value
+                            val isSelected = pendingColor == colorValue
+                            val color = if (colorValue == null) PostItCyan else parseColorSafe(colorValue)
+                            
+                            Box(
+                                modifier = Modifier
+                                    .size(60.dp)
+                                    .background(color)
+                                    .clickable { pendingColor = colorValue }
+                                    .handDrawnBorder(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (isSelected) {
+                                    Box(modifier = Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.2f)))
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
+                                }
+                            }
+                        }
+
+                        item(span = { GridItemSpan(4) }) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text("Completion Stickers", color = Color.Black, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+                        }
+
+                        val stickerItems = listOf<ShopItem?>(null) + ownedStickers
+                        items(stickerItems) { item ->
+                            val url = item?.value
+                            val isSelected = pendingSticker == url
+                            
+                            Box(
+                                modifier = Modifier
+                                    .size(60.dp)
+                                    .handDrawnBorder()
+                                    .clickable { pendingSticker = url },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                if (url == null) {
+                                    Text("None", style = MaterialTheme.typography.labelSmall)
+                                } else {
+                                    AsyncImage(
+                                        model = url,
+                                        contentDescription = null,
+                                        modifier = Modifier.fillMaxSize().padding(4.dp)
+                                    )
+                                }
+                                if (isSelected) {
+                                    Box(modifier = Modifier.matchParentSize().background(Color.Black.copy(alpha = 0.2f)))
+                                    Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.setDefaultPostColor(pendingColor)
+                        viewModel.setDefaultStickerUrl(pendingSticker)
+                        showAssetDialog = false
+                    },
+                    modifier = Modifier.handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp)
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                Button(
+                    onClick = { showAssetDialog = false },
+                    modifier = Modifier.handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                ) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     if (showCreateDialog) {
@@ -386,77 +557,6 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                         )
                     }
 
-                    if (ownedColors.isNotEmpty()) {
-                        Text("Post Color", style = MaterialTheme.typography.labelMedium, color = Color.Black)
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .background(PostItCyan)
-                                        .clickable { selectedColor = null }
-                                        .handDrawnBorder(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (selectedColor == null) {
-                                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.Black))
-                                    }
-                                }
-                            }
-                            items(ownedColors) { colorItem ->
-                                val color = try { Color(android.graphics.Color.parseColor(colorItem.value)) } catch (e: Exception) { Color.Gray }
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .background(color)
-                                        .clickable { selectedColor = colorItem.value }
-                                        .handDrawnBorder(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (selectedColor == colorItem.value) {
-                                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.Black))
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    ExposedDropdownMenuBox(
-                        expanded = householdDropdownExpanded,
-                        onExpandedChange = { if (!isLoading) householdDropdownExpanded = it }
-                    ) {
-                        OutlinedTextField(
-                            value = selectedHousehold?.household_name ?: "Select household",
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Household") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(householdDropdownExpanded) },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
-                                .handDrawnBorder(),
-                            shape = RoundedCornerShape(0.dp),
-                            enabled = !isLoading,
-                            colors = blackTextFieldColors
-                        )
-                        ExposedDropdownMenu(
-                            expanded = householdDropdownExpanded,
-                            onDismissRequest = { householdDropdownExpanded = false }
-                        ) {
-                            households.forEach { household ->
-                                DropdownMenuItem(
-                                    text = { Text(household.household_name, color = Color.Black) },
-                                    onClick = {
-                                        viewModel.selectHousehold(household.household_id)
-                                        householdDropdownExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
                     errorText?.let {
                         Text(text = it, color = Color.Red)
                     }
@@ -495,7 +595,6 @@ fun BoardScreen(modifier: Modifier = Modifier) {
         var editBody by remember(post.post_id) { mutableStateOf(post.body ?: "") }
         var editPointValue by remember(post.post_id) { mutableStateOf(post.point_value?.toString() ?: "") }
         var editDueAt by remember(post.post_id) { mutableStateOf(post.due_at?.filter { it.isDigit() } ?: "") }
-        var editColor by remember(post.post_id) { mutableStateOf(post.color) }
         var editError by remember(post.post_id) { mutableStateOf<String?>(null) }
 
         fun handleUpdatePost() {
@@ -512,7 +611,7 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                     body = editBody.trim(),
                     pointValue = editPointValue.toIntOrNull(),
                     dueAt = formattedDate,
-                    color = editColor
+                    color = post.color // Keep original color when editing
                 )
             }
         }
@@ -588,43 +687,6 @@ fun BoardScreen(modifier: Modifier = Modifier) {
                         )
                     }
 
-                    if (ownedColors.isNotEmpty()) {
-                        Text("Post Color", style = MaterialTheme.typography.labelMedium, color = Color.Black)
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            item {
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .background(PostItCyan)
-                                        .clickable { editColor = null }
-                                        .handDrawnBorder(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (editColor == null) {
-                                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.Black))
-                                    }
-                                }
-                            }
-                            items(ownedColors) { colorItem ->
-                                val color = try { Color(android.graphics.Color.parseColor(colorItem.value)) } catch (e: Exception) { Color.Gray }
-                                Box(
-                                    modifier = Modifier
-                                        .size(32.dp)
-                                        .clip(CircleShape)
-                                        .background(color)
-                                        .clickable { editColor = colorItem.value }
-                                        .handDrawnBorder(),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    if (editColor == colorItem.value) {
-                                        Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.Black))
-                                    }
-                                }
-                            }
-                        }
-                    }
-
                     editError?.let { Text(text = it, color = Color.Red) }
                     (postActionState as? BoardViewModel.PostActionState.Error)?.let {
                         Text(text = it.message, color = Color.Red)
@@ -689,59 +751,74 @@ fun BoardScreen(modifier: Modifier = Modifier) {
 @Composable
 private fun PostCard(
     post: Post,
+    stickerUrl: String? = null,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
-    onComplete: () -> Unit
+    onComplete: () -> Unit,
+    isTablet: Boolean = false
 ) {
-    val backgroundColor = post.color?.let { 
+    val isCompleted = post.status == "completed"
+
+    val baseColor = post.color?.let {
         try { Color(android.graphics.Color.parseColor(it)) } catch (e: Exception) { PostItCyan }
     } ?: PostItCyan
 
+    val backgroundColor = if (isCompleted) Color.LightGray.copy(alpha = 0.6f) else baseColor
+    val textDecoration = if (isCompleted) TextDecoration.LineThrough else TextDecoration.None
+
+    val cardModifier = if (isTablet) {
+        Modifier.fillMaxWidth().aspectRatio(1f).handDrawnBorder()
+    } else {
+        Modifier.fillMaxWidth().handDrawnBorder()
+    }
+
     Card(
-        modifier = Modifier.fillMaxWidth().handDrawnBorder(),
+        modifier = cardModifier,
         shape = RoundedCornerShape(0.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         colors = CardDefaults.cardColors(containerColor = backgroundColor)
     ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                post.title?.let {
-                    Text(
-                        text = it,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f),
-                        color = Color.Black
-                    )
-                }
-                Text(
-                    text = post.type.replaceFirstChar { it.uppercase() },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Color.Black
-                )
-                IconButton(onClick = onEdit) {
-                    Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.padding(4.dp), tint = Color.Black)
-                }
-                IconButton(onClick = onDelete) {
-                    Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.padding(4.dp))
-                }
-            }
-            post.body?.let {
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(text = it, style = MaterialTheme.typography.bodyMedium, color = Color.Black)
-            }
-            if (post.type == "chore") {
-                Spacer(modifier = Modifier.height(4.dp))
+        Box(modifier = Modifier.fillMaxSize()) {
+            Column(modifier = Modifier.padding(12.dp)) {
                 Row(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
+                    post.title?.let {
+                        Text(
+                            text = it,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.weight(1f),
+                            color = Color.Black,
+                            textDecoration = textDecoration
+                        )
+                    }
+                    Text(
+                        text = post.type.replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.Black
+                    )
+                    IconButton(onClick = onEdit, enabled = !isCompleted) {
+                        Icon(Icons.Default.Edit, contentDescription = "Edit", modifier = Modifier.padding(4.dp), tint = if (isCompleted) Color.Gray else Color.Black)
+                    }
+                    IconButton(onClick = onDelete) {
+                        Icon(Icons.Default.Delete, contentDescription = "Delete", tint = Color.Red, modifier = Modifier.padding(4.dp))
+                    }
+                }
+                post.body?.let {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = it,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Black,
+                        textDecoration = textDecoration
+                    )
+                }
+                if (post.type == "chore") {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Column {
                         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                             post.status?.let {
                                 Text(
@@ -760,19 +837,57 @@ private fun PostCard(
                             } else it
                             Text(text = "Due: $displayDate", style = MaterialTheme.typography.labelSmall, color = Color.Black)
                         }
-                    }
-                    if (post.status == "pending") {
-                        Button(
-                            onClick = onComplete,
-                            modifier = Modifier.handDrawnBorder(),
-                            shape = RoundedCornerShape(0.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
-                        ) {
-                            Text("Complete", style = MaterialTheme.typography.labelSmall)
+                        if (!isTablet && post.status == "pending") {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Button(
+                                onClick = onComplete,
+                                modifier = Modifier.handDrawnBorder(),
+                                shape = RoundedCornerShape(0.dp),
+                                colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                            ) {
+                                Text("Complete", style = MaterialTheme.typography.labelSmall)
+                            }
                         }
                     }
                 }
             }
+
+            if (isCompleted) {
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .background(Color.Gray.copy(alpha = 0.2f))
+                )
+                if (stickerUrl != null) {
+                    AsyncImage(
+                        model = stickerUrl,
+                        contentDescription = "Completed Sticker",
+                        modifier = Modifier
+                            .size(100.dp)
+                            .align(Alignment.Center),
+                        contentScale = ContentScale.Fit
+                    )
+                }
+            }
+            if (isTablet && post.type == "chore" && post.status == "pending") {
+                Button(
+                    onClick = onComplete,
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).handDrawnBorder(),
+                    shape = RoundedCornerShape(0.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White, contentColor = Color.Black)
+                ) {
+                    Text("Complete", style = MaterialTheme.typography.labelSmall)
+                }
+            }
         }
+    }
+}
+
+fun parseColorSafe(colorString: String?): Color {
+    if (colorString == null) return Color.Gray
+    return try {
+        Color(android.graphics.Color.parseColor(colorString))
+    } catch (e: Exception) {
+        Color.Gray
     }
 }
