@@ -68,41 +68,25 @@ END;$$;
 ALTER FUNCTION "public"."add_user_to_household_by_email"("p_new_member_email" "text", "p_household_id" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."change_email"("newemail" character varying, "userid" "uuid") RETURNS "void"
-    LANGUAGE "plpgsql"
-    AS $$BEGIN
-
-UPDATE users
-SET email = newEmail
-WHERE user_id = userID;
-
-END$$;
-
-
-ALTER FUNCTION "public"."change_email"("newemail" character varying, "userid" "uuid") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."change_household_name"("newhouseholdname" character varying, "householdid" "uuid") RETURNS "void"
-    LANGUAGE "plpgsql"
-    AS $$BEGIN
-
-UPDATE households
-SET household_name = newHouseholdName
-WHERE household_id = householdID;
-
-END$$;
-
-
-ALTER FUNCTION "public"."change_household_name"("newhouseholdname" character varying, "householdid" "uuid") OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."complete_chore"("p_post_id" "uuid", "p_member_id" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-DECLARE
+    AS $$DECLARE
     v_points integer;
     v_household_id uuid;
 BEGIN
+
+  IF NOT EXISTS (
+    SELECT 1 FROM household_members
+    WHERE (household_id = householdID
+      AND user_id = auth.uid()
+      AND role = 'admin')
+      or
+      (household_id = householdID
+      AND userID = auth.uid())
+  ) THEN
+    RAISE EXCEPTION 'Denied. Caller is not an admin of this household or the member being removed.';
+  END IF;
+
     -- 1. Get the point value and household_id of the chore
     SELECT point_value, household_id INTO v_points, v_household_id
     FROM public.posts
@@ -120,29 +104,10 @@ BEGIN
             weekly_points = COALESCE(weekly_points, 0) + v_points
         WHERE member_id = p_member_id;
     END IF;
-END;
-$$;
+END;$$;
 
 
 ALTER FUNCTION "public"."complete_chore"("p_post_id" "uuid", "p_member_id" "uuid") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."complete_task"("postid" "uuid", "memberid" "uuid") RETURNS "void"
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$BEGIN
-
-UPDATE household_members
-SET household_members.total_points = household_members.total_points + posts.point_value
-FROM posts, household_members
-WHERE (post_id = postID and household_members.member_id = memberID);
-
-DELETE FROM posts
-WHERE post_id = postID;
-
-END$$;
-
-
-ALTER FUNCTION "public"."complete_task"("postid" "uuid", "memberid" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."create_household"("p_household_name" "text", "p_user_id" "uuid") RETURNS "uuid"
@@ -168,22 +133,18 @@ END;$$;
 ALTER FUNCTION "public"."create_household"("p_household_name" "text", "p_user_id" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."create_post"("newtitle" character varying, "newbody" "text", "defpoint" integer) RETURNS "void"
-    LANGUAGE "plpgsql"
-    AS $$BEGIN
-
-INSERT INTO posts (title, body, point_value)
-VALUES (newTitle, newBody, defPoint);
-
-END$$;
-
-
-ALTER FUNCTION "public"."create_post"("newtitle" character varying, "newbody" "text", "defpoint" integer) OWNER TO "postgres";
-
-
 CREATE OR REPLACE FUNCTION "public"."delete_household"("householdid" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$BEGIN
+
+  IF NOT EXISTS (
+    SELECT 1 FROM household_members
+    WHERE household_id = householdID
+      AND user_id = auth.uid()
+      AND role = 'admin'
+  ) THEN
+    RAISE EXCEPTION 'Denied. Caller is not an admin of this household.';
+  END IF;
 
   DELETE FROM households
   WHERE (households.household_id = householdID);
@@ -194,59 +155,29 @@ END$$;
 ALTER FUNCTION "public"."delete_household"("householdid" "uuid") OWNER TO "postgres";
 
 
-CREATE OR REPLACE FUNCTION "public"."delete_post"("postid" "uuid") RETURNS "void"
+CREATE OR REPLACE FUNCTION "public"."delete_message"("messageid" "uuid") RETURNS "void"
+    LANGUAGE "plpgsql"
+    AS $$BEGIN
+  DELETE FROM messages
+  WHERE messages.message_id = messageID;
+END$$;
+
+
+ALTER FUNCTION "public"."delete_message"("messageid" "uuid") OWNER TO "postgres";
+
+
+CREATE OR REPLACE FUNCTION "public"."edit_message"("newcontent" "text", "messageid" "uuid") RETURNS "void"
     LANGUAGE "plpgsql"
     AS $$BEGIN
 
-  DELETE FROM posts
-  WHERE (posts.post_id = postID);
+UPDATE messages
+SET content = newContent, edited_at = (now())
+WHERE message_id = messageID;
 
 END$$;
 
 
-ALTER FUNCTION "public"."delete_post"("postid" "uuid") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."get_household_info"("householdid" integer) RETURNS character varying
-    LANGUAGE "plpgsql"
-    AS $$BEGIN
-
-SELECT households.household_name, households.owner_member_id, household_members.user_id
-FROM households, household_members
-WHERE (households.household_id = householdID);
-
-END;$$;
-
-
-ALTER FUNCTION "public"."get_household_info"("householdid" integer) OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."get_household_list"() RETURNS character varying
-    LANGUAGE "plpgsql"
-    AS $$BEGIN
-
-SELECT households.household_name
-FROM households, household_members, users
-WHERE (household_member.household_id = households.household_id) and (household_members.user_id = users.user_id);
-
-END;$$;
-
-
-ALTER FUNCTION "public"."get_household_list"() OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."get_household_members"("householdid" "uuid") RETURNS json
-    LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$BEGIN
-
-  SELECT household_members.nickname
-  FROM household_members
-  WHERE (household_members.household_id = householdID);
-
-END$$;
-
-
-ALTER FUNCTION "public"."get_household_members"("householdid" "uuid") OWNER TO "postgres";
+ALTER FUNCTION "public"."edit_message"("newcontent" "text", "messageid" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."handle_new_user"() RETURNS "trigger"
@@ -269,23 +200,21 @@ ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
 
 CREATE OR REPLACE FUNCTION "public"."purchase_shop_item"("p_member_id" "uuid", "p_household_id" "uuid", "p_item_id" "uuid", "p_price" integer) RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
-    AS $$
-BEGIN
+    AS $$BEGIN
     -- Check if user has enough points
-    IF (SELECT total_points FROM public.household_members WHERE member_id = p_member_id AND household_id = p_household_id) < p_price THEN
+    IF (SELECT total_points FROM public.household_members WHERE member_id = p_member_id AND member_id = auth.uid() AND household_id = p_household_id) < p_price THEN
         RAISE EXCEPTION 'Not enough points!';
     END IF;
 
     -- Deduct points
     UPDATE public.household_members
     SET total_points = total_points - p_price
-    WHERE member_id = p_member_id AND household_id = p_household_id;
+    WHERE member_id = p_member_id  AND member_id = auth.uid() AND household_id = p_household_id;
 
     -- Add to member_rewards
     INSERT INTO public.member_rewards (member_id, reward_id)
     VALUES (p_member_id, p_item_id);
-END;
-$$;
+END;$$;
 
 
 ALTER FUNCTION "public"."purchase_shop_item"("p_member_id" "uuid", "p_household_id" "uuid", "p_item_id" "uuid", "p_price" integer) OWNER TO "postgres";
@@ -294,6 +223,17 @@ ALTER FUNCTION "public"."purchase_shop_item"("p_member_id" "uuid", "p_household_
 CREATE OR REPLACE FUNCTION "public"."remove_household_member"("userid" "uuid", "householdid" "uuid") RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM household_members
+    WHERE (household_id = householdID
+      AND user_id = auth.uid()
+      AND role = 'admin')
+      or
+      (household_id = householdID
+      AND userID = auth.uid())
+  ) THEN
+    RAISE EXCEPTION 'Denied. Caller is not an admin of this household or the member being removed.';
+  END IF;
 
 DELETE FROM household_members
 WHERE (household_members.member_id = userID) and (household_members.household_id = householdID);
@@ -345,20 +285,6 @@ END;$$;
 
 
 ALTER FUNCTION "public"."send_message"("p_household_id" "uuid", "p_from_member_id" "uuid", "p_content" "text") OWNER TO "postgres";
-
-
-CREATE OR REPLACE FUNCTION "public"."view_household_posts"("householdid" "uuid") RETURNS "void"
-    LANGUAGE "plpgsql"
-    AS $$BEGIN
-
-SELECT *
-FROM posts
-WHERE household_id = householdID;
-
-END$$;
-
-
-ALTER FUNCTION "public"."view_household_posts"("householdid" "uuid") OWNER TO "postgres";
 
 
 CREATE OR REPLACE FUNCTION "public"."view_messages"("householdid" "uuid") RETURNS "void"
@@ -425,7 +351,8 @@ CREATE TABLE IF NOT EXISTS "public"."messages" (
     "from_member_id" "uuid",
     "sent_at" timestamp with time zone DEFAULT "now"(),
     "content" "text" NOT NULL,
-    "household_id" "uuid" NOT NULL
+    "household_id" "uuid" NOT NULL,
+    "edited_at" timestamp with time zone
 );
 
 
@@ -641,7 +568,27 @@ CREATE POLICY "Allow household owner to update household" ON "public"."household
 
 
 
+CREATE POLICY "Allow user to read posts in household" ON "public"."posts" FOR SELECT TO "authenticated" USING (("auth"."uid"() IN ( SELECT "household_members"."user_id"
+   FROM "public"."household_members"
+  WHERE ("household_members"."household_id" = "posts"."household_id"))));
+
+
+
 CREATE POLICY "Allow users to delete own posts" ON "public"."posts" FOR DELETE TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "author_id"));
+
+
+
+CREATE POLICY "Allow users to delete their own messages" ON "public"."messages" FOR DELETE TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."household_members"
+  WHERE (("household_members"."member_id" = "messages"."from_member_id") AND ("household_members"."user_id" = "auth"."uid"())))));
+
+
+
+CREATE POLICY "Allow users to edit their own messages" ON "public"."messages" FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."household_members"
+  WHERE (("household_members"."member_id" = "messages"."from_member_id") AND ("household_members"."user_id" = "auth"."uid"()))))) WITH CHECK ((EXISTS ( SELECT 1
+   FROM "public"."household_members"
+  WHERE (("household_members"."member_id" = "messages"."from_member_id") AND ("household_members"."user_id" = "auth"."uid"())))));
 
 
 
@@ -682,10 +629,6 @@ CREATE POLICY "Enable read access for all authenticated users" ON "public"."rewa
 
 
 CREATE POLICY "Enable read access for all users" ON "public"."messages" FOR SELECT TO "authenticated" USING (true);
-
-
-
-CREATE POLICY "Enable read access for all users" ON "public"."posts" FOR SELECT USING (true);
 
 
 
@@ -751,27 +694,9 @@ GRANT ALL ON FUNCTION "public"."add_user_to_household_by_email"("p_new_member_em
 
 
 
-GRANT ALL ON FUNCTION "public"."change_email"("newemail" character varying, "userid" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."change_email"("newemail" character varying, "userid" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."change_email"("newemail" character varying, "userid" "uuid") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."change_household_name"("newhouseholdname" character varying, "householdid" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."change_household_name"("newhouseholdname" character varying, "householdid" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."change_household_name"("newhouseholdname" character varying, "householdid" "uuid") TO "service_role";
-
-
-
 GRANT ALL ON FUNCTION "public"."complete_chore"("p_post_id" "uuid", "p_member_id" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."complete_chore"("p_post_id" "uuid", "p_member_id" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."complete_chore"("p_post_id" "uuid", "p_member_id" "uuid") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."complete_task"("postid" "uuid", "memberid" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."complete_task"("postid" "uuid", "memberid" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."complete_task"("postid" "uuid", "memberid" "uuid") TO "service_role";
 
 
 
@@ -781,39 +706,21 @@ GRANT ALL ON FUNCTION "public"."create_household"("p_household_name" "text", "p_
 
 
 
-GRANT ALL ON FUNCTION "public"."create_post"("newtitle" character varying, "newbody" "text", "defpoint" integer) TO "anon";
-GRANT ALL ON FUNCTION "public"."create_post"("newtitle" character varying, "newbody" "text", "defpoint" integer) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."create_post"("newtitle" character varying, "newbody" "text", "defpoint" integer) TO "service_role";
-
-
-
 GRANT ALL ON FUNCTION "public"."delete_household"("householdid" "uuid") TO "anon";
 GRANT ALL ON FUNCTION "public"."delete_household"("householdid" "uuid") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."delete_household"("householdid" "uuid") TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."delete_post"("postid" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."delete_post"("postid" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."delete_post"("postid" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."delete_message"("messageid" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."delete_message"("messageid" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."delete_message"("messageid" "uuid") TO "service_role";
 
 
 
-GRANT ALL ON FUNCTION "public"."get_household_info"("householdid" integer) TO "anon";
-GRANT ALL ON FUNCTION "public"."get_household_info"("householdid" integer) TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_household_info"("householdid" integer) TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."get_household_list"() TO "anon";
-GRANT ALL ON FUNCTION "public"."get_household_list"() TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_household_list"() TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."get_household_members"("householdid" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."get_household_members"("householdid" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."get_household_members"("householdid" "uuid") TO "service_role";
+GRANT ALL ON FUNCTION "public"."edit_message"("newcontent" "text", "messageid" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."edit_message"("newcontent" "text", "messageid" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."edit_message"("newcontent" "text", "messageid" "uuid") TO "service_role";
 
 
 
@@ -844,12 +751,6 @@ GRANT ALL ON FUNCTION "public"."rls_auto_enable"() TO "service_role";
 GRANT ALL ON FUNCTION "public"."send_message"("p_household_id" "uuid", "p_from_member_id" "uuid", "p_content" "text") TO "anon";
 GRANT ALL ON FUNCTION "public"."send_message"("p_household_id" "uuid", "p_from_member_id" "uuid", "p_content" "text") TO "authenticated";
 GRANT ALL ON FUNCTION "public"."send_message"("p_household_id" "uuid", "p_from_member_id" "uuid", "p_content" "text") TO "service_role";
-
-
-
-GRANT ALL ON FUNCTION "public"."view_household_posts"("householdid" "uuid") TO "anon";
-GRANT ALL ON FUNCTION "public"."view_household_posts"("householdid" "uuid") TO "authenticated";
-GRANT ALL ON FUNCTION "public"."view_household_posts"("householdid" "uuid") TO "service_role";
 
 
 
