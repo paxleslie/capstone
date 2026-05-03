@@ -72,23 +72,6 @@ class BoardViewModel : ViewModel() {
     private val _defaultStickerUrl = MutableStateFlow<String?>(null)
     val defaultStickerUrl: StateFlow<String?> = _defaultStickerUrl
 
-    private val universalItems = listOf(
-        ShopItem(
-            id = "d82b1b39-3946-43e1-8fa0-2d5e938dc009",
-            name = "Red Note",
-            price = 50,
-            type = "color",
-            value = "#FF5252"
-        ),
-        ShopItem(
-            id = "green_note_placeholder", 
-            name = "Green Note",
-            price = 50,
-            type = "color",
-            value = "#AED581"
-        )
-    )
-
     fun selectHousehold(householdId: String) {
         SessionManager.selectHousehold(householdId)
     }
@@ -138,14 +121,12 @@ class BoardViewModel : ViewModel() {
                     val ownedRewardIds = ShopRepository.getOwnedItems(member.member_id, householdId)
                     val dbItems = ShopRepository.getShopItems(householdId)
                     
-                    val allPossibleItems = dbItems + universalItems
-                    val ownedNames = allPossibleItems.filter { it.id in ownedRewardIds }.map { it.name }.toSet()
+                    val ownedNames = dbItems.filter { it.id in ownedRewardIds }.map { it.name }.toSet()
 
-                    val ownedItems = allPossibleItems
+                    val ownedItems = dbItems
                         .filter { item ->
                             item.id in ownedRewardIds || item.name in ownedNames
                         }
-                        .distinctBy { it.name }
 
                     val newOwnedColors = ownedItems
                         .filter { it.type == "color" }
