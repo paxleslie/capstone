@@ -77,14 +77,11 @@ BEGIN
 
   IF NOT EXISTS (
     SELECT 1 FROM household_members
-    WHERE (household_id = householdID
-      AND user_id = auth.uid()
-      AND role = 'admin')
-      or
-      (household_id = householdID
-      AND userID = auth.uid())
+    WHERE (posts.post_id = p_post_id
+    and household_members.user_id = auth.uid()
+    and household_members.household_id = posts.household_id)
   ) THEN
-    RAISE EXCEPTION 'Denied. Caller is not an admin of this household or the member being removed.';
+    RAISE EXCEPTION 'Denied. Caller is not a member of this household.';
   END IF;
 
     -- 1. Get the point value and household_id of the chore
@@ -202,14 +199,14 @@ CREATE OR REPLACE FUNCTION "public"."purchase_shop_item"("p_member_id" "uuid", "
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$BEGIN
     -- Check if user has enough points
-    IF (SELECT total_points FROM public.household_members WHERE member_id = p_member_id AND member_id = auth.uid() AND household_id = p_household_id) < p_price THEN
+    IF (SELECT total_points FROM public.household_members WHERE member_id = p_member_id AND user_id = auth.uid() AND household_id = p_household_id) < p_price THEN
         RAISE EXCEPTION 'Not enough points!';
     END IF;
 
     -- Deduct points
     UPDATE public.household_members
     SET total_points = total_points - p_price
-    WHERE member_id = p_member_id  AND member_id = auth.uid() AND household_id = p_household_id;
+    WHERE member_id = p_member_id  AND user_id = auth.uid() AND household_id = p_household_id;
 
     -- Add to member_rewards
     INSERT INTO public.member_rewards (member_id, reward_id)
@@ -224,21 +221,30 @@ CREATE OR REPLACE FUNCTION "public"."remove_household_member"("userid" "uuid", "
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$BEGIN
   IF NOT EXISTS (
-    SELECT 1 FROM household_members
-    WHERE (household_id = householdID
-      AND user_id = auth.uid()
-      AND role = 'admin')
-      or
-      (household_id = householdID
-      AND userID = auth.uid())
+    SELECT 1
+    FROM household_members hm
+    WHERE hm.household_id = householdID
+      AND (
+        -- admin can remove anyone in household
+        (
+          hm.user_id = auth.uid()
+          AND hm.role = 'admin'
+        )
+        OR
+        -- regular user can remove only their own member row
+        (
+          hm.member_id = userID
+          AND hm.user_id = auth.uid()
+        )
+      )
   ) THEN
     RAISE EXCEPTION 'Denied. Caller is not an admin of this household or the member being removed.';
   END IF;
 
-DELETE FROM household_members
-WHERE (household_members.member_id = userID) and (household_members.household_id = householdID);
-
-END$$;
+  DELETE FROM household_members
+  WHERE member_id = userID
+    AND household_id = householdID;
+END;$$;
 
 
 ALTER FUNCTION "public"."remove_household_member"("userid" "uuid", "householdid" "uuid") OWNER TO "postgres";
@@ -605,6 +611,13 @@ CREATE POLICY "Allow users to update their own information" ON "public"."users" 
 
 
 CREATE POLICY "Allow users to view household members" ON "public"."household_members" FOR SELECT TO "authenticated" USING (true);
+
+
+
+CREATE POLICY "Allow users to view household members" ON "public"."users" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM ("public"."household_members" "viewer"
+     JOIN "public"."household_members" "target" ON (("viewer"."household_id" = "target"."household_id")))
+  WHERE (("viewer"."user_id" = "auth"."uid"()) AND ("target"."user_id" = "users"."user_id")))));
 
 
 
