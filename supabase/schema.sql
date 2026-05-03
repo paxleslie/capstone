@@ -195,6 +195,21 @@ end;$$;
 ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."is_household_member"("p_household_id" "uuid", "p_user_id" "uuid") RETURNS boolean
+    LANGUAGE "plpgsql" STABLE SECURITY DEFINER
+    AS $$BEGIN
+  SELECT EXISTS 
+  (
+    SELECT 1 FROM household_members WHERE
+    household_members.household_id = p_household_id
+    AND household_members.user_id = p_user_id
+  );
+END;$$;
+
+
+ALTER FUNCTION "public"."is_household_member"("p_household_id" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."purchase_shop_item"("p_member_id" "uuid", "p_household_id" "uuid", "p_item_id" "uuid", "p_price" integer) RETURNS "void"
     LANGUAGE "plpgsql" SECURITY DEFINER
     AS $$BEGIN
@@ -610,14 +625,7 @@ CREATE POLICY "Allow users to update their own information" ON "public"."users" 
 
 
 
-CREATE POLICY "Allow users to view household members" ON "public"."household_members" FOR SELECT TO "authenticated" USING (true);
-
-
-
-CREATE POLICY "Allow users to view household members" ON "public"."users" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM ("public"."household_members" "viewer"
-     JOIN "public"."household_members" "target" ON (("viewer"."household_id" = "target"."household_id")))
-  WHERE (("viewer"."user_id" = "auth"."uid"()) AND ("target"."user_id" = "users"."user_id")))));
+CREATE POLICY "Allow users to view household members" ON "public"."household_members" FOR SELECT TO "authenticated" USING ("public"."is_household_member"("household_id", ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -628,8 +636,7 @@ CREATE POLICY "Allow users to view joined households" ON "public"."households" F
 
 
 
-CREATE POLICY "Create post, tied to uid" ON "public"."posts" FOR INSERT WITH CHECK (("auth"."uid"() IN ( SELECT "household_members"."user_id"
-   FROM "public"."household_members")));
+CREATE POLICY "Create post, tied to uid" ON "public"."posts" FOR INSERT TO "authenticated" WITH CHECK ("public"."is_household_member"("household_id", ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -637,11 +644,7 @@ CREATE POLICY "Enable creation of household for auth users" ON "public"."househo
 
 
 
-CREATE POLICY "Enable read access for all authenticated users" ON "public"."rewards" FOR SELECT TO "authenticated" USING (true);
-
-
-
-CREATE POLICY "Enable read access for all users" ON "public"."messages" FOR SELECT TO "authenticated" USING (true);
+CREATE POLICY "Enable read access for all users" ON "public"."messages" FOR SELECT TO "authenticated" USING ("public"."is_household_member"("household_id", ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -740,6 +743,12 @@ GRANT ALL ON FUNCTION "public"."edit_message"("newcontent" "text", "messageid" "
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "anon";
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "service_role";
+
+
+
+GRANT ALL ON FUNCTION "public"."is_household_member"("p_household_id" "uuid", "p_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."is_household_member"("p_household_id" "uuid", "p_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."is_household_member"("p_household_id" "uuid", "p_user_id" "uuid") TO "service_role";
 
 
 
