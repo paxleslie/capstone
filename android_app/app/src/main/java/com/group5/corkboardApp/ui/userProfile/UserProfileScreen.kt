@@ -48,6 +48,9 @@ import com.group5.corkboardApp.ui.household.HouseholdViewModel
 import com.group5.corkboardApp.ui.theme.CorkboardBackground
 import com.group5.corkboardApp.ui.theme.PostItMagenta
 import com.group5.corkboardApp.ui.theme.handDrawnBorder
+import com.group5.corkboardApp.util.SupabaseClient
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.status.SessionStatus
 
 @Composable
 fun UserProfileScreen(modifier: Modifier = Modifier) {
@@ -81,8 +84,14 @@ fun UserProfileScreen(modifier: Modifier = Modifier) {
     
     val focusManager = LocalFocusManager.current
 
-    LaunchedEffect(Unit) {
-        profileViewModel.getUserInfo()
+    // Observe session status to refresh info when account changes
+    val sessionStatus by SupabaseClient.client.auth.sessionStatus.collectAsState()
+
+    LaunchedEffect(sessionStatus) {
+        if (sessionStatus is SessionStatus.Authenticated) {
+            profileViewModel.getUserInfo()
+            householdViewModel.fetchHouseholds()
+        }
     }
 
     LaunchedEffect(createState) {

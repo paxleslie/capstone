@@ -6,8 +6,12 @@ import com.group5.corkboardApp.data.model.UserProfile
 import com.group5.corkboardApp.data.repository.AuthRepository
 import com.group5.corkboardApp.data.repository.UserRepository
 import com.group5.corkboardApp.util.SessionManager
+import com.group5.corkboardApp.util.SupabaseClient
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -40,10 +44,22 @@ class AccountSettingsViewModel : ViewModel() {
     val passwordVerificationStatus: StateFlow<PasswordVerificationState> = _passwordVerificationStatus
 
     init {
-        loadCurrentUserData()
+        observeSessionStatus()
     }
 
-    private fun loadCurrentUserData() {
+    private fun observeSessionStatus() {
+        viewModelScope.launch {
+            SupabaseClient.client.auth.sessionStatus.collectLatest { status ->
+                if (status is SessionStatus.Authenticated) {
+                    loadCurrentUserData()
+                } else if (status is SessionStatus.NotAuthenticated) {
+                    _currentUserData.value = UserProfile()
+                }
+            }
+        }
+    }
+
+    fun loadCurrentUserData() {
         viewModelScope.launch {
             try {
                 val user = AuthRepository.currentUser() ?: return@launch

@@ -9,6 +9,9 @@ import com.group5.corkboardApp.data.model.Household
 import com.group5.corkboardApp.data.model.HouseholdMember
 import com.group5.corkboardApp.data.repository.AuthRepository
 import com.group5.corkboardApp.data.repository.HouseholdRepository
+import com.group5.corkboardApp.util.SupabaseClient
+import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.status.SessionStatus
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -119,7 +122,25 @@ class HouseholdViewModel : ViewModel() {
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     init {
-        fetchHouseholds()
+        observeSessionStatus()
+    }
+
+    private fun observeSessionStatus() {
+        viewModelScope.launch {
+            SupabaseClient.client.auth.sessionStatus.collect { status ->
+                when (status) {
+                    is SessionStatus.Authenticated -> {
+                        fetchHouseholds()
+                    }
+                    is SessionStatus.NotAuthenticated -> {
+                        _householdListState.value = HouseholdListState.Idle
+                        _detailState.value = HouseholdDetailState.Idle
+                        _navState.value = NavState.Idle
+                    }
+                    else -> {}
+                }
+            }
+        }
     }
 
     fun createHousehold(name: String) {
