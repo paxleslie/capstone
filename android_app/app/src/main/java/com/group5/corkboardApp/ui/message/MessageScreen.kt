@@ -1,6 +1,7 @@
 package com.group5.corkboardApp.ui.message
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -23,6 +24,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -40,6 +42,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
@@ -58,6 +61,7 @@ fun MessageScreen(modifier: Modifier = Modifier) {
 
     val messages by viewModel.messages.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
     val selectedHouseholdId by SessionManager.selectedHouseholdId.collectAsState()
 
     var households by remember { mutableStateOf<List<Household>>(emptyList()) }
@@ -135,14 +139,25 @@ fun MessageScreen(modifier: Modifier = Modifier) {
                     )
                 }
             }
+
+            Text(
+                text = "Household Chat",
+                style = MaterialTheme.typography.headlineSmall
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
         }
-
-        Text(
-            text = "Household Chat",
-            style = MaterialTheme.typography.headlineSmall
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
+        else {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+            return@Column
+        }
 
         errorMessage?.let {
             Text(
@@ -153,42 +168,53 @@ fun MessageScreen(modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.height(8.dp))
         }
 
-        if (selectedHouseholdId == null) {
+        val selectedHouseholdId = selectedHouseholdId ?: run {
             Text("Select a household first")
             return@Column
         }
 
-        if (currentMemberId == null) {
+        val currentMemberId = currentMemberId ?: run {
             Text("Could not find your membership for this household")
             return@Column
         }
 
         // Message list
-        LazyColumn(
-            state = listState,
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(messages, key = { it.message_id }) { message ->
-                MessageItem(
-                    message = message,
-                    currentMemberId = currentMemberId!!,
-                    onDelete = {
-                        viewModel.deleteMessage(
-                            messageId = message.message_id,
-                            householdId = selectedHouseholdId!!
-                        )
-                    },
-                    onEdit = { newContent ->
-                        viewModel.editMessage(
-                            messageId = message.message_id,
-                            householdId = selectedHouseholdId!!,
-                            newContent = newContent
-                        )
-                    }
-                )
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        } else {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(messages, key = { it.message_id }) { message ->
+                    MessageItem(
+                        message = message,
+                        currentMemberId = currentMemberId,
+                        onDelete = {
+                            viewModel.deleteMessage(
+                                messageId = message.message_id,
+                                householdId = selectedHouseholdId
+                            )
+                        },
+                        onEdit = { newContent ->
+                            viewModel.editMessage(
+                                messageId = message.message_id,
+                                householdId = selectedHouseholdId,
+                                newContent = newContent
+                            )
+                        }
+                    )
+                }
             }
         }
         Spacer(modifier = Modifier.height(8.dp))
@@ -210,8 +236,8 @@ fun MessageScreen(modifier: Modifier = Modifier) {
                     onSend = {
                         if (messageText.isNotBlank()) {
                             viewModel.sendMessage(
-                                householdId = selectedHouseholdId!!,
-                                memberId = currentMemberId!!,
+                                householdId = selectedHouseholdId,
+                                memberId = currentMemberId,
                                 content = messageText.trim()
                             )
 
@@ -228,8 +254,8 @@ fun MessageScreen(modifier: Modifier = Modifier) {
                 onClick = {
                     if (messageText.isNotBlank()) {
                         viewModel.sendMessage(
-                            householdId = selectedHouseholdId!!,
-                            memberId = currentMemberId!!,
+                            householdId = selectedHouseholdId,
+                            memberId = currentMemberId,
                             content = messageText.trim()
                         )
 

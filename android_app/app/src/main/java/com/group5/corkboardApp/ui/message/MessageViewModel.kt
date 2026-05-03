@@ -52,9 +52,6 @@ data class HouseholdMessageMember(
 
 class MessageViewModel : ViewModel() {
 
-    // Supabase client
-    private val client = SupabaseClient.client
-
     // Logcat tag
     private val TAG = "MessageVM"
 
@@ -66,15 +63,24 @@ class MessageViewModel : ViewModel() {
     private val _errorMessage = MutableStateFlow<String?>(null)
     val errorMessage: StateFlow<String?> = _errorMessage
 
+    // True while a fetch is in flight; UI shows a spinner instead of the (briefly empty) list
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading
+
     // Fetch all messages for a household
     fun fetchMessages(householdId: String) {
+        _isLoading.value = true
         viewModelScope.launch {
             try {
+                // remove stale data before trying to pull fresh
+                _messages.value = emptyList()
                 _errorMessage.value = null
                 _messages.value = MessageRepository.getMessagesForHousehold(householdId)
             } catch (e: Exception) {
                 Log.e(TAG, "Fetch failed", e)
                 _errorMessage.value = e.localizedMessage ?: "Failed to fetch messages"
+            } finally {
+                _isLoading.value = false
             }
         }
     }
