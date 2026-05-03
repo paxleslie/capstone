@@ -80,7 +80,7 @@ class ShopViewModelTest {
     }
 
     @Test
-    fun `loadShopData merges DB items with universals and marks owned`() = runTest {
+    fun `loadShopData returns DB items and marks owned`() = runTest {
         coEvery { ShopRepository.getOwnedItems(any(), any()) } returns listOf("real-red-id")
 
         SessionManager.selectHousehold("house-123")
@@ -90,7 +90,7 @@ class ShopViewModelTest {
         val state = viewModel.shopState.value
         assertTrue("Expected Success, got $state", state is ShopViewModel.ShopState.Success)
         val success = state as ShopViewModel.ShopState.Success
-        // DB Red Note dedupes against the universal Red Note by name; the merged entry uses the DB id
+        // DB items pass through to success state with their real ids; owned ids match
         assertTrue(success.items.any { it.id == "real-red-id" && it.name == "Red Note" })
         assertEquals(listOf("real-red-id"), success.ownedItemIds)
         assertEquals(100, success.currentPoints)

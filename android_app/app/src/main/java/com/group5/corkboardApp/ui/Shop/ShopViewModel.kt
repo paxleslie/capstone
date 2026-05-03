@@ -45,24 +45,6 @@ class ShopViewModel : ViewModel() {
     private val _purchaseState = MutableStateFlow<PurchaseState>(PurchaseState.Idle)
     val purchaseState: StateFlow<PurchaseState> = _purchaseState
 
-    // UNIVERSAL SHOP ITEMS
-    private val universalItems = listOf(
-        ShopItem(
-            id = "d82b1b39-3946-43e1-8fa0-2d5e938dc009", // Real ID from your screenshot
-            name = "Red Note",
-            price = 50,
-            type = "color",
-            value = "#FF5252"
-        ),
-        ShopItem(
-            id = "green_note_placeholder", 
-            name = "Green Note",
-            price = 50,
-            type = "color",
-            value = "#AED581"
-        )
-    )
-
     init {
         loadHouseholds()
         observeSelectedHousehold()
@@ -124,28 +106,24 @@ class ShopViewModel : ViewModel() {
 
             // 1. Get available items from rewards table
             val dbItems = try { ShopRepository.getShopItems(hid) } catch (_: Exception) { emptyList() }
-            
-            // 2. Merge with defaults, prioritizing DB items to get real IDs
-            val finalItems = (dbItems + universalItems).distinctBy { it.name }
 
-            // 3. Get currently owned items for this member
+            // 2. Get currently owned items for this member
             val ownedRewardIds = try { ShopRepository.getOwnedItems(member.member_id, hid) } catch (_: Exception) { emptyList() }
-            
+
             Log.d("ShopViewModel", "Found ${ownedRewardIds.size} owned reward IDs in DB for member ${member.member_id}")
 
-            // 4. Map ownership by Name to handle potential ID inconsistencies
-            val allPossibleItems = dbItems + universalItems
-            val ownedNames = allPossibleItems.filter { it.id in ownedRewardIds }.map { it.name }.toSet()
-            
+            // 3. Map ownership by Name to handle potential ID inconsistencies
+            val ownedNames = dbItems.filter { it.id in ownedRewardIds }.map { it.name }.toSet()
+
             Log.d("ShopViewModel", "Owned item names: $ownedNames")
 
-            // 5. Mark items as owned if ID matches OR Name matches an owned item
-            val displayOwnedIds = finalItems.filter { item ->
+            // 4. Mark items as owned if ID matches OR Name matches an owned item
+            val displayOwnedIds = dbItems.filter { item ->
                 item.id in ownedRewardIds || item.name in ownedNames
             }.map { it.id }
 
             _shopState.value = ShopState.Success(
-                items = finalItems,
+                items = dbItems,
                 ownedItemIds = displayOwnedIds,
                 currentPoints = member.total_points ?: 0
             )
@@ -191,7 +169,7 @@ class ShopViewModel : ViewModel() {
                 // Freshly fetch data to ensure we aren't buying twice
                 val freshOwnedIds = ShopRepository.getOwnedItems(member.member_id, hid)
                 val dbItems = ShopRepository.getShopItems(hid)
-                val ownedNames = (dbItems + universalItems).filter { it.id in freshOwnedIds }.map { it.name }
+                val ownedNames = dbItems.filter { it.id in freshOwnedIds }.map { it.name }
                 
                 if (ownedNames.contains(item.name)) {
                     _purchaseState.value = PurchaseState.Error("Already owned")
@@ -206,10 +184,6 @@ class ShopViewModel : ViewModel() {
                 // Resolve real UUID from DB
                 val realItem = dbItems.find { it.name == item.name }
                 val itemIdToBuy = realItem?.id ?: item.id
-                
-                if (realItem == null && item.id.contains("placeholder")) {
-                    throw Exception("Item '${item.name}' not found in database.")
-                }
 
                 // 3. Perform purchase
                 ShopRepository.buyItem(member.member_id, hid, itemIdToBuy, item.price)
