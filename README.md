@@ -51,19 +51,23 @@ Key relationships:
 ### Shop
 - Spend points to unlock rewards (post themes, completion stickers)
 - Ownership is tracked per household member
+<img width="417" height="857" alt="Screenshot 2026-05-03 212045" src="https://github.com/user-attachments/assets/d4b183c7-13b8-4cb3-91d1-eeb3ea1c116f" />
 
 ### Household Management
 - Create and join households
 - Add and remove members by email
 - Admin role with elevated permissions (delete any post, edit member points)
 - Rename households
+<img width="387" height="855" alt="Screenshot 2026-05-03 214317" src="https://github.com/user-attachments/assets/bab50c4c-7127-4e00-86f1-1f0f4ea31e71" />
 
 ### Profile & Account
 - Update display name, email, and password
 - View your households and membership details
+<img width="382" height="851" alt="Screenshot 2026-05-03 214355" src="https://github.com/user-attachments/assets/ee88176e-ecad-4847-bd23-2da5ab723a7f" />
 
-### Planned
+### Messaging
 - Messaging between household members
+<img width="384" height="850" alt="Screenshot 2026-05-03 214517" src="https://github.com/user-attachments/assets/18fd7030-5368-4e3a-a3f8-73f2fec6b3a8" />
 
 ---
 
