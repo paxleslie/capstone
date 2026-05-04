@@ -75,19 +75,15 @@ CREATE OR REPLACE FUNCTION "public"."complete_chore"("p_post_id" "uuid", "p_memb
     v_household_id uuid;
 BEGIN
 
-  IF NOT EXISTS (
-    SELECT 1 FROM household_members
-    WHERE (posts.post_id = p_post_id
-    and household_members.user_id = auth.uid()
-    and household_members.household_id = posts.household_id)
-  ) THEN
-    RAISE EXCEPTION 'Denied. Caller is not a member of this household.';
-  END IF;
 
     -- 1. Get the point value and household_id of the chore
     SELECT point_value, household_id INTO v_points, v_household_id
     FROM public.posts
     WHERE post_id = p_post_id;
+
+  IF NOT is_household_member(v_household_id, (SELECT auth.uid())) THEN
+    RAISE EXCEPTION 'Denied. Caller is not a member of this household.';
+  END IF;
 
     -- 2. Update the post status to 'completed'
     UPDATE public.posts
@@ -195,10 +191,26 @@ end;$$;
 ALTER FUNCTION "public"."handle_new_user"() OWNER TO "postgres";
 
 
+CREATE OR REPLACE FUNCTION "public"."is_household_admin"("p_household_id" "uuid", "p_user_id" "uuid") RETURNS boolean
+    LANGUAGE "sql" STABLE SECURITY DEFINER
+    SET "search_path" TO 'public', 'pg_temp'
+    AS $$
+    SELECT EXISTS (
+      SELECT 1 FROM public.household_members
+      WHERE household_id = p_household_id
+        AND user_id = p_user_id
+        AND role = 'admin'
+    );
+  $$;
+
+
+ALTER FUNCTION "public"."is_household_admin"("p_household_id" "uuid", "p_user_id" "uuid") OWNER TO "postgres";
+
+
 CREATE OR REPLACE FUNCTION "public"."is_household_member"("p_household_id" "uuid", "p_user_id" "uuid") RETURNS boolean
     LANGUAGE "plpgsql" STABLE SECURITY DEFINER
     AS $$BEGIN
-  SELECT EXISTS 
+  RETURN EXISTS 
   (
     SELECT 1 FROM household_members WHERE
     household_members.household_id = p_household_id
@@ -545,9 +557,7 @@ CREATE POLICY "Allow admin to access data for their household" ON "public"."hous
 
 
 
-CREATE POLICY "Allow admin to add user as household member" ON "public"."household_members" FOR INSERT TO "authenticated" WITH CHECK (("auth"."uid"() IN ( SELECT "households"."household_id"
-   FROM "public"."households"
-  WHERE (("household_members"."household_id" = "households"."household_id") AND (("household_members"."role")::"text" = 'admin'::"text")))));
+CREATE POLICY "Allow admin to add user as household member" ON "public"."household_members" FOR INSERT TO "authenticated" WITH CHECK ("public"."is_household_admin"("household_id", ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -563,9 +573,11 @@ CREATE POLICY "Allow admin to delete household posts" ON "public"."posts" FOR DE
 
 
 
-CREATE POLICY "Allow admin to remove household members" ON "public"."household_members" FOR DELETE TO "authenticated" USING (("auth"."uid"() IN ( SELECT "households"."household_id"
-   FROM "public"."households"
-  WHERE (("household_members"."household_id" = "households"."household_id") AND (("household_members"."role")::"text" = 'admin'::"text")))));
+CREATE POLICY "Allow admin to remove household members" ON "public"."household_members" FOR DELETE TO "authenticated" USING ("public"."is_household_admin"("household_id", ( SELECT "auth"."uid"() AS "uid")));
+
+
+
+CREATE POLICY "Allow admin to update household members" ON "public"."household_members" FOR UPDATE TO "authenticated" USING ("public"."is_household_admin"("household_id", ( SELECT "auth"."uid"() AS "uid"))) WITH CHECK ("public"."is_household_admin"("household_id", ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -617,6 +629,10 @@ CREATE POLICY "Allow users to remove themselves from household" ON "public"."hou
 
 
 
+CREATE POLICY "Allow users to update own membership" ON "public"."household_members" FOR UPDATE TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "user_id")) WITH CHECK ((( SELECT "auth"."uid"() AS "uid") = "user_id"));
+
+
+
 CREATE POLICY "Allow users to update own posts" ON "public"."posts" FOR UPDATE TO "authenticated" USING ((( SELECT "auth"."uid"() AS "uid") = "author_id")) WITH CHECK (true);
 
 
@@ -644,7 +660,7 @@ CREATE POLICY "Enable creation of household for auth users" ON "public"."househo
 
 
 
-CREATE POLICY "Enable read access for all users" ON "public"."messages" FOR SELECT TO "authenticated" USING ("public"."is_household_member"("household_id", ( SELECT "auth"."uid"() AS "uid")));
+CREATE POLICY "Enable read access for household members" ON "public"."messages" FOR SELECT TO "authenticated" USING ("public"."is_household_member"("household_id", ( SELECT "auth"."uid"() AS "uid")));
 
 
 
@@ -667,12 +683,6 @@ CREATE POLICY "Users can view rewards for their households or global ones" ON "p
 CREATE POLICY "Users can view their own owned rewards" ON "public"."member_rewards" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
    FROM "public"."household_members"
   WHERE (("household_members"."member_id" = "member_rewards"."member_id") AND ("household_members"."user_id" = "auth"."uid"())))));
-
-
-
-CREATE POLICY "allow admin to update household members" ON "public"."household_members" FOR UPDATE TO "authenticated" USING ((EXISTS ( SELECT 1
-   FROM "public"."household_members" "household_members_1"
-  WHERE (("household_members_1"."household_id" = "household_members_1"."household_id") AND ("household_members_1"."user_id" = "auth"."uid"()) AND (("household_members_1"."role")::"text" = 'admin'::"text")))));
 
 
 
@@ -743,6 +753,13 @@ GRANT ALL ON FUNCTION "public"."edit_message"("newcontent" "text", "messageid" "
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "anon";
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "authenticated";
 GRANT ALL ON FUNCTION "public"."handle_new_user"() TO "service_role";
+
+
+
+REVOKE ALL ON FUNCTION "public"."is_household_admin"("p_household_id" "uuid", "p_user_id" "uuid") FROM PUBLIC;
+GRANT ALL ON FUNCTION "public"."is_household_admin"("p_household_id" "uuid", "p_user_id" "uuid") TO "anon";
+GRANT ALL ON FUNCTION "public"."is_household_admin"("p_household_id" "uuid", "p_user_id" "uuid") TO "authenticated";
+GRANT ALL ON FUNCTION "public"."is_household_admin"("p_household_id" "uuid", "p_user_id" "uuid") TO "service_role";
 
 
 
