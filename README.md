@@ -46,7 +46,8 @@ Key relationships:
 - Complete chores to earn points
 - Filter posts by household
 - Customize posts, completion stickers using rewards earned from the shop
-https://cdn.discordapp.com/attachments/1430281054983295113/1500683769093427332/Screenshot_2026-05-03_212122.png?ex=69f9542b&is=69f802ab&hm=e0d335b701b303b34b7e630361a03221c24d1d1d14907f502d5c9c721d89cd23&
+<img width="1375" height="811" alt="Screenshot 2026-05-03 212122" src="https://github.com/user-attachments/assets/1ad79f75-6a42-4392-960c-49a4bc398fd7" />
+
 ### Shop
 - Spend points to unlock rewards (post themes, completion stickers)
 - Ownership is tracked per household member
