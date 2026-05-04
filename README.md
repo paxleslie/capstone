@@ -1,4 +1,4 @@
-# Corkboard [![CI](https://github.com/paxleslie/capstone/actions/workflows/ci.yml/badge.svg)](https://github.com/paxleslie/capstone/actions/workflows/ci.yml)
+# Noted [![CI](https://github.com/paxleslie/capstone/actions/workflows/ci.yml/badge.svg)](https://github.com/paxleslie/capstone/actions/workflows/ci.yml) [![Latest Release](https://img.shields.io/github/v/release/paxleslie/capstone)](https://github.com/paxleslie/capstone/releases/latest)
 
 A household management app for families and roommates built to run on Android. With an emphasis on ease of use and intuitive controls, it centralizes tasks, chores and notes into a shared household board. Analogous to the real life inspiration, the emphasis on ease of use allows for those of limited technical experience to successfully interact with the app. A virtual alternative in a world that is rapidly adopting screens in communal areas.
 
@@ -77,13 +77,13 @@ GitHub Actions runs on every pull request to `main`:
 
 1. **Unit tests**: ViewModel state logic for post CRUD operations (MockK + coroutines-test)
 2. **Debug APK build**: Verifies the app compiles cleanly
-3. **PLANNED - APK artifact**: Uploaded to the workflow run for download
+3. **APK**: Created via workflow run as a standalone APK
 
 ---
 
 ## Installation
 
-1. Download the APK from the latest [GitHub Actions](https://github.com/paxleslie/capstone/actions) run under **Artifacts**
+1. Download the latest APK from [Noted Releases](https://github.com/paxleslie/capstone/releases/latest)
 2. On your Android device, enable **Install from unknown sources** (Settings → Security)
 3. Open the downloaded APK and install
 4. Sign up or log in to get started
