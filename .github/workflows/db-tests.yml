@@ -1,0 +1,45 @@
+name: DB Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  db-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase local stack
+        run: supabase start
+
+      - name: Capture DB URL
+        id: db
+        run: echo "url=$(supabase status -o env | grep '^DB_URL=' | cut -d= -f2)" >> "$GITHUB_OUTPUT"
+
+      - name: Apply schema
+        run: psql "${{ steps.db.outputs.url }}" -v ON_ERROR_STOP=1 -f supabase/schema.sql
+
+      - name: Install pg_prove
+        run: sudo apt-get update && sudo apt-get install -y libtap-parser-sourcehandler-pgtap-perl
+
+      - name: Run pgTAP tests
+        env:
+          PGHOST: 127.0.0.1
+          PGPORT: 54322
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: postgres
+        run: pg_prove --verbose supabase/tests/*.sql
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop --no-backup
